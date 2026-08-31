@@ -1,19 +1,26 @@
-# Texas Our Little Miss — Prelim to State Registration
+# Texas Our Little Miss — Honor Roll State Registration
 
-A Netlify-hosted registration and invoicing workflow for the 2026 Texas Our Little Miss State Universal Beauty Competition.
+A separate Netlify-hosted registration and invoicing workflow for 2026 Texas Our Little Miss Honor Roll and Winner's Circle contestants.
 
-The public form reproduces the information and entry-level pricing from the supplied Cognito Forms registration, but replaces embedded Stripe card fields with a QuickBooks Online invoice. No card information passes through this site.
+The public form follows the existing Prelim-to-State workflow while using the published [Honor Roll Cognito form](https://www.cognitoforms.com/TexasOurLittleMiss2/TexasStateUniversalBeauty2026HonorRollOnly) prices. It replaces embedded card fields with a QuickBooks Online invoice, so no card information passes through this site.
+
+Published pricing:
+
+- Honor Roll contestant: `$330` total with a `$100` deposit due now.
+- Winner's Circle contestant: `$125` total with a `$75` deposit due now.
+- Winner's Circle contestant with contestant and chaperone party tickets: `$175` total with a `$75` deposit due now.
+- Eligible optional competitions selected on the Big Form are billed at 50% of their standard advance price. Tickets and advertising remain full price.
 
 ## Workflow
 
 1. A contestant completes the registration form and signs the release.
-2. A Netlify Function saves the registration in Netlify Blobs, creates the contestant as a QuickBooks customer, creates a `$150` deposit invoice, enables QuickBooks online payments, and emails the invoice.
+2. A Netlify Function saves the registration in a dedicated Honor Roll Netlify Blobs store, creates the contestant as a QuickBooks customer, creates the selected `$100` or `$75` deposit invoice, enables QuickBooks online payments, and emails the invoice.
 3. Intuit sends a signed `Payment` or `Invoice` webhook after the deposit is paid.
 4. The app emails the contestant a private Big Form link. If Resend is not configured, it adds the link to the paid QuickBooks invoice and emails the invoice again through QuickBooks.
 5. The Big Form sends its fee summary to the protected `/api/paperwork-complete` endpoint.
-6. The deposit-only invoice is replaced with the contestant's full placement-based entry fee plus every known Big Form optional charge. The existing `$150` payment remains applied, and QuickBooks emails the updated balance.
+6. The deposit-only invoice is replaced with the contestant's selected full entry fee, eligible optional competitions at 50%, and full-price tickets and advertising. The original deposit remains applied, and QuickBooks emails the updated balance.
 
-Unknown or pending optional prices are deliberately left off the updated invoice and identified in its customer memo.
+Unknown or pending prices are deliberately left off the updated invoice and identified in its customer memo.
 
 ## Deploy through GitHub and Netlify
 
@@ -55,7 +62,7 @@ QuickBooks returns an online payment link only when online payments are enabled 
 The paid invitation adds these query parameters to `BIG_FORM_URL`:
 
 ```text
-?registration=REGISTRATION_UUID&workflow_token=PRIVATE_TOKEN
+?registration=REGISTRATION_UUID&workflow_token=PRIVATE_TOKEN&workflow=honor_roll
 ```
 
 The Big Form should preserve those values with its saved draft. After it saves the completed paperwork and calculates fees, it must call this site server-to-server:
@@ -72,8 +79,10 @@ Content-Type: application/json
   "fees": {
     "lines": [
       {
+        "category": "Optional Categories",
         "item": "Miss Photogenic",
         "description": "1 picture",
+        "sourceField": "miss_photogenic",
         "quantity": 1,
         "rate": 50,
         "amount": 50,
@@ -86,7 +95,9 @@ Content-Type: application/json
 }
 ```
 
-Use the same long random value for `BIG_FORM_CALLBACK_SECRET` in both Netlify sites. The server validates both that shared secret and the contestant-specific workflow token before changing an invoice.
+Use the same long random value for `BIG_FORM_CALLBACK_SECRET` in both Netlify sites. Configure the Big Form's `HONOR_ROLL_REGISTRATION_WORKFLOW_URL` with this site's deployed URL. The server validates both the shared secret and contestant-specific workflow token before changing an invoice, while existing Prelim-to-State links continue using their original callback.
+
+The Honor Roll discount is applied only when `sourceField` identifies an eligible optional competition. The current eligible fields are Miss Photogenic, Livin' Doll, Commercial Print, Pro Am Modeling, Optional Talent, Prettiest & Best, and Practice Interview. Theme-party tickets, guest badges, patron listings, and program ads remain full price.
 
 ## Local checks
 
@@ -105,5 +116,7 @@ npm run build
 - Intuit webhook signatures are verified with HMAC-SHA256 over the untouched request body.
 - QuickBooks access tokens are refreshed automatically, and each newly rotated refresh token is saved back to Netlify Blobs.
 - The public status endpoint requires an independent random status token; a registration UUID by itself cannot reveal the invoice link.
-- The full entry fee replaces the original deposit line. The paid `$150` stays linked to that invoice, so QuickBooks calculates the remaining balance.
+- The full selected entry fee replaces the original deposit line. The paid `$100` or `$75` stays linked to that invoice, so QuickBooks calculates the remaining balance.
+- Payment webhooks verify that the complete entry-specific deposit invoice is paid before sending the private Big Form invitation.
+- This project uses its own browser-draft key and Netlify Blobs store, so it does not mix Honor Roll registrations with Prelim-to-State registrations.
 - Real customer data, OAuth credentials, webhook tokens, setup keys, and email API keys must never be added to the repository.

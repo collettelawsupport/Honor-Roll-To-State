@@ -1,6 +1,5 @@
 import { randomBytes, randomUUID } from 'node:crypto';
 import type { Config } from '@netlify/functions';
-import { DEPOSIT_CENTS } from '../../app/registration-data.ts';
 import { HttpError, errorResponse, json, readJsonBody } from '../lib/http.mts';
 import {
   createCustomer,
@@ -65,7 +64,7 @@ export default async function submitRegistration(request: Request) {
         status: 'submitted',
         values: normalized.values,
         entryFeeCents: normalized.entryFeeCents,
-        depositCents: DEPOSIT_CENTS,
+        depositCents: normalized.depositCents,
       });
     }
 

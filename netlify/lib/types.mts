@@ -34,8 +34,10 @@ export type RegistrationRecord = {
 };
 
 export type BigFormFeeLine = {
+  category?: string;
   item: string;
   description?: string;
+  sourceField?: string;
   quantity: number;
   rate: number | null;
   amount: number | null;

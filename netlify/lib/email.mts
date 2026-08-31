@@ -22,7 +22,7 @@ export async function sendBigFormInvitation(record: RegistrationRecord, bigFormU
       from,
       to: [record.values.email],
       subject: `Deposit received — complete ${contestant}'s Big Form`,
-      html: `<p>Thank you! We received the $150 state registration deposit for <strong>${escapeHtml(contestant)}</strong>.</p><p>The next step is to complete the contestant Big Form:</p><p><a href="${escapeHtml(bigFormUrl)}">Complete the Big Form</a></p><p>After the Big Form is submitted, QuickBooks will email the updated invoice with the remaining entry fee and selected optionals.</p>`,
+      html: `<p>Thank you! We received the $${record.depositCents / 100} Honor Roll state registration deposit for <strong>${escapeHtml(contestant)}</strong>.</p><p>The next step is to complete the contestant Big Form:</p><p><a href="${escapeHtml(bigFormUrl)}">Complete the Big Form</a></p><p>After the Big Form is submitted, QuickBooks will email the updated invoice with the remaining entry fee, 50%-off eligible Honor Roll optionals, and any full-price tickets or advertising.</p>`,
     }),
   });
   if (!response.ok) {

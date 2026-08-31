@@ -2,7 +2,6 @@
 
 import { FormEvent, PointerEvent, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  DEPOSIT_CENTS,
   ageDivisions,
   ageUnits,
   entryLevelFor,
@@ -18,7 +17,7 @@ type RegistrationValues = Record<string, string>;
 type SignatureKind = 'typed' | 'drawn';
 type SavedDraft = { values: RegistrationValues; currentStep: number; submissionKey: string };
 
-const STORAGE_KEY = 'olm-2026-prelim-to-state-draft-v1';
+const STORAGE_KEY = 'olm-2026-honor-roll-to-state-draft-v1';
 
 function makeSubmissionKey() {
   if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) return crypto.randomUUID();
@@ -155,7 +154,7 @@ export default function RegistrationPage() {
   }, [currentStep, draftReady, submissionKey, values]);
 
   const selectedEntry = useMemo(() => entryLevelFor(values.entry_level || ''), [values.entry_level]);
-  const remainingBalance = selectedEntry ? Math.max(0, selectedEntry.feeCents - DEPOSIT_CENTS) : null;
+  const remainingBalance = selectedEntry ? Math.max(0, selectedEntry.feeCents - selectedEntry.depositCents) : null;
   const current = registrationSteps[currentStep];
   const percent = Math.round(((currentStep + 1) / registrationSteps.length) * 100);
   const signatureKind = (values.signature_kind || 'typed') as SignatureKind;
@@ -230,7 +229,7 @@ export default function RegistrationPage() {
   return (
     <main>
       <header className="site-header">
-        <a className="brand" href="#top" aria-label="Texas Our Little Miss registration home">
+        <a className="brand" href="#top" aria-label="Texas Our Little Miss Honor Roll registration home">
           <span className="brand-mark" aria-hidden="true">OLM</span>
           <span>Texas Our Little Miss</span>
         </a>
@@ -238,8 +237,8 @@ export default function RegistrationPage() {
       </header>
 
       <section className="hero" id="top">
-        <p className="eyebrow">2026 State Competition</p>
-        <h1>State Universal Beauty Competition Registration</h1>
+        <p className="eyebrow">2026 Honor Roll Registration</p>
+        <h1>State Universal Beauty Competition</h1>
         <p className="hero-copy">October 30–November 1, 2026 · College Station, Texas</p>
         <p className="location"><b>Staged events:</b> Texas A&amp;M Hotel and Conference Center</p>
         <p className="location"><b>Host hotel:</b> Texas A&amp;M Hotel, 177 Joe Routt Blvd, College Station, TX 77840</p>
@@ -271,8 +270,8 @@ export default function RegistrationPage() {
               <span>Tell us about the contestant and the parent or guardian who will chaperone her during state weekend.</span>
             </div>
             <article className="info-panel welcome-panel">
-              <h3>Welcome, preliminary contestants!</h3>
-              <p>Complete this registration and the $150 deposit invoice to secure the contestant&apos;s state registration and contestant number.</p>
+              <h3>Welcome, Honor Roll contestants!</h3>
+              <p>This form is for contestants who have entered a Texas Our Little Miss state pageant in the past. Complete the registration and deposit invoice to secure the contestant&apos;s state registration and contestant number.</p>
             </article>
             <div className="field-grid">
               <label className="field"><span>Contestant first name <RequiredMark /></span><input type="text" required={currentStep === 0} autoComplete="given-name" value={values.contestant_first_name || ''} onChange={(event) => setValue('contestant_first_name', event.target.value)} /></label>
@@ -296,7 +295,7 @@ export default function RegistrationPage() {
             <div className="section-heading">
               <p>Step 2 of 3</p>
               <h2 id="step-1-title">Choose your entry level</h2>
-              <span>The standard entry fee is $660. Preliminary contestants receive the placement-based discounted entry fee shown below.</span>
+              <span>Select the Honor Roll or Winner&apos;s Circle entry that applies to the contestant.</span>
             </div>
             <article className="info-panel important-panel">
               <h3>Important dates and information</h3>
@@ -304,7 +303,7 @@ export default function RegistrationPage() {
             </article>
             <fieldset className="choice-field">
               <legend>Entry level <RequiredMark /></legend>
-              <p className="field-help">The required $150 deposit is subtracted from the selected entry fee.</p>
+              <p className="field-help">The $100 Honor Roll deposit or $75 Winner&apos;s Circle deposit is subtracted from the selected entry fee.</p>
               <div className="choice-grid">
                 {entryLevels.map((level) => (
                   <label className="choice" key={level.value}>
@@ -318,7 +317,7 @@ export default function RegistrationPage() {
             {selectedEntry && (
               <aside className="price-card" aria-live="polite">
                 <div><span>Selected entry fee</span><strong>{formatCurrency(selectedEntry.feeCents)}</strong></div>
-                <div><span>Deposit invoice due now</span><strong>{formatCurrency(DEPOSIT_CENTS)}</strong></div>
+                <div><span>Deposit invoice due now</span><strong>{formatCurrency(selectedEntry.depositCents)}</strong></div>
                 <div><span>Remaining entry balance after deposit</span><strong>{formatCurrency(remainingBalance || 0)}</strong></div>
               </aside>
             )}
@@ -328,7 +327,7 @@ export default function RegistrationPage() {
             <div className="section-heading">
               <p>Step 3 of 3</p>
               <h2 id="step-2-title">Release and QuickBooks invoice</h2>
-              <span>Review the release, sign electronically, and continue to the secure $150 invoice from QuickBooks.</span>
+              <span>Review the release, sign electronically, and continue to the secure {selectedEntry ? formatCurrency(selectedEntry.depositCents) : 'deposit'} invoice from QuickBooks.</span>
             </div>
             <article className="info-panel release-panel">
               <h3>Release information</h3>
@@ -352,8 +351,8 @@ export default function RegistrationPage() {
             </label>
             <aside className="invoice-summary" aria-label="Invoice summary">
               <p>QuickBooks invoice</p>
-              <div><span>Required deposit</span><strong>{formatCurrency(DEPOSIT_CENTS)}</strong></div>
-              <small>QuickBooks will email the same invoice to {values.email || 'the email address entered above'}. After the deposit is paid, the contestant receives the Big Form. Completing that form updates this invoice with the remaining entry fee and selected optionals.</small>
+              <div><span>Required deposit</span><strong>{selectedEntry ? formatCurrency(selectedEntry.depositCents) : '—'}</strong></div>
+              <small>QuickBooks will email the same invoice to {values.email || 'the email address entered above'}. After the deposit is paid, the contestant receives the Big Form. Completing it updates this invoice with the remaining entry fee, 50%-off eligible Honor Roll optionals, and any full-price tickets or advertising.</small>
             </aside>
           </section>
 
@@ -368,7 +367,7 @@ export default function RegistrationPage() {
                 <button className="button-primary" type="button" onClick={goNext}>Continue <span aria-hidden="true">→</span></button>
               ) : (
                 <button className="button-primary" type="submit" disabled={submissionStatus === 'submitting'}>
-                  {submissionStatus === 'submitting' ? 'Creating invoice…' : 'Continue to $150 invoice'}
+                  {submissionStatus === 'submitting' ? 'Creating invoice…' : `Continue to ${selectedEntry ? formatCurrency(selectedEntry.depositCents) : 'deposit'} invoice`}
                 </button>
               )}
             </div>

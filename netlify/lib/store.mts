@@ -1,7 +1,7 @@
 import { getStore } from '@netlify/blobs';
 import type { RegistrationRecord } from './types.mts';
 
-const STORE_NAME = 'olm-prelim-to-state';
+const STORE_NAME = 'olm-honor-roll-to-state';
 
 function store() {
   return getStore({ name: STORE_NAME, consistency: 'strong' });

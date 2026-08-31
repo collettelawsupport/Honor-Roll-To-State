@@ -1,4 +1,4 @@
-export const DEPOSIT_CENTS = 15_000;
+export const HONOR_ROLL_OPTIONAL_DISCOUNT = 0.5;
 
 export const ageUnits = ['months', 'years'] as const;
 
@@ -14,12 +14,9 @@ export const ageDivisions = [
 ] as const;
 
 export const entryLevels = [
-  { value: 'preregistration', label: 'PreRegistration before Preliminary Pageant', feeCents: 35_000 },
-  { value: 'queen_king', label: 'Won QUEEN/KING at Preliminary Pageant', feeCents: 37_000 },
-  { value: 'princess', label: 'Won PRINCESS at Preliminary Pageant', feeCents: 38_000 },
-  { value: 'personality_mini_queen', label: 'Won PERSONALITY/MINI QUEEN at Preliminary Pageant', feeCents: 39_000 },
-  { value: 'alternate', label: 'Won Alternate at Preliminary Pageant', feeCents: 40_000 },
-  { value: 'at_large', label: 'Contestant At-Large (Did not enter a Preliminary Pageant)', feeCents: 66_000 },
+  { value: 'honor_roll', label: 'Honor Roll Contestant', feeCents: 33_000, depositCents: 10_000 },
+  { value: 'winners_circle_125', label: "Winner's Circle Contestant — entry fee only", feeCents: 12_500, depositCents: 7_500 },
+  { value: 'winners_circle_175', label: "Winner's Circle Contestant — entry fee plus contestant and chaperone party tickets", feeCents: 17_500, depositCents: 7_500 },
 ] as const;
 
 export const usStates = [
@@ -39,17 +36,19 @@ export const registrationSteps = [
 ] as const;
 
 export const importantInformation = [
-  'Required deposit: $150. The deposit is subtracted from the selected entry fee.',
-  'Contestants who attended a preliminary pageant receive the discounted entry fee associated with their placement.',
-  'The entry fee includes registration, all required competitions, one chaperone badge, contestant and chaperone meal and party tickets, a souvenir program book, and downloadable professional competition photos.',
-  'Big Forms, photos, good luck messages, and ads are due October 8, 2026.',
-  'Optionals may be paid in advance or at the door.',
-  'Submit this form and deposit within five days after the preliminary pageant to receive discounted pricing.',
+  'Honor Roll entry fee: $330 with a $100 deposit due now. The deposit is subtracted from the entry fee.',
+  "Winner's Circle entry fee: $125, or $175 including a party ticket for the contestant and chaperone. A $75 deposit is due now, and contestants must have already paid the World deposit.",
+  'Honor Roll optional competitions are 50% off when paid in advance. Optionals paid at the door are regular price.',
+  'The remaining entry fee is due on or before October 9, 2026 to lock in the Honor Roll price. After that date, preliminary-contestant pricing applies.',
+  'Big Forms, photos, good luck messages, and ads are due October 15, 2026.',
+  'Submit this form and the deposit as soon as possible. QuickBooks will email the remaining balance after registration.',
 ];
 
-export const registrationReleaseText = `By electronically signing this form, I understand that this form and the required deposit are due five days after the preliminary pageant. After that date, I may still register the contestant at contestant at-large pricing. I understand that all money received by Texas Our Little Miss is non-refundable and non-transferable if the contestant does not compete at the state competition. This form will secure the contestant's number and entry into the Texas Our Little Miss State Finals, October 30–November 1, 2026, in College Station, Texas.
+export const registrationReleaseText = `By electronically signing this form, I understand that the remainder of the contestant's entry fee is due on or before October 9, 2026. After that date, I may still register at preliminary-contestant pricing. I understand that all money received by Texas Our Little Miss is non-refundable and non-transferable if the contestant does not compete at the state competition. This form will secure the contestant's number and entry into the Texas Our Little Miss State Finals, October 30–November 1, 2026, in College Station, Texas.
 
-I understand that Our Little Miss is a three-tier system and that if the contestant wins a top-four title—Queen, Princess, Mini Queen, or Personality Plus—at the state finals, she will be required to attend the World Competition in January 2027. If she does not attend the World Competition, she forfeits the title and all awards received, including crown, banner, and trophy, so the next contestant in line may represent Texas at the World Finals.`;
+I understand that Our Little Miss is a three-tier system and that if the contestant wins a top-four title—Queen, Princess, Mini Queen, or Personality Plus—at the state finals, she will be required to attend the World Competition in January 2027. If she does not attend the World Competition, she forfeits the title and all awards received, including crown, banner, and trophy, so the next contestant in line may represent Texas at the World Finals.
+
+Winner's Circle contestants have already paid their World deposit and are attending the World pageant. They cannot win division titles, but they may win optionals they enter and other side awards.`;
 
 export const requiredRegistrationFields = [
   'contestant_first_name', 'contestant_last_name', 'chaperone_first_name', 'chaperone_last_name',
