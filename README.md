@@ -29,6 +29,8 @@ Unknown or pending prices are deliberately left off the updated invoice and iden
 3. Copy every variable from `.env.example` into **Netlify → Project configuration → Environment variables**.
 4. Redeploy after setting the variables.
 
+The dedicated production build falls back to `https://honorrollregistration.texasourlittlemiss.net` for public metadata and application links. `NEXT_PUBLIC_SITE_URL` should still be set to that same value in Netlify so the deployment configuration remains explicit.
+
 Netlify Blobs stores registrations, private workflow tokens, invoice mappings, OAuth state, and the rotating QuickBooks refresh token. Secrets and contestant records are never committed to GitHub.
 
 ## QuickBooks Online setup

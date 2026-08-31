@@ -14,6 +14,7 @@ import type { BigFormFeeSummary, RegistrationRecord } from './types.mts';
 const TOKEN_URL = 'https://oauth.platform.intuit.com/oauth2/v1/tokens/bearer';
 const AUTHORIZE_URL = 'https://appcenter.intuit.com/connect/oauth2';
 const MINOR_VERSION = '75';
+const PRODUCTION_SITE_URL = 'https://honorrollregistration.texasourlittlemiss.net';
 
 type QuickBooksFault = {
   Message?: string;
@@ -115,7 +116,10 @@ function apiBase() {
 }
 
 function siteUrl() {
-  return (process.env.URL || process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000').replace(/\/$/, '');
+  const fallback = process.env.NODE_ENV === 'production'
+    ? PRODUCTION_SITE_URL
+    : process.env.URL || 'http://localhost:3000';
+  return (process.env.NEXT_PUBLIC_SITE_URL || fallback).replace(/\/$/, '');
 }
 
 function redirectUri() {

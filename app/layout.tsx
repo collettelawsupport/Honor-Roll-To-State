@@ -1,7 +1,9 @@
 import type { Metadata } from 'next';
 import './globals.css';
 
-const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
+const productionSiteUrl = 'https://honorrollregistration.texasourlittlemiss.net';
+const siteUrl = process.env.NEXT_PUBLIC_SITE_URL
+  || (process.env.NODE_ENV === 'production' ? productionSiteUrl : 'http://localhost:3000');
 const title = '2026 Honor Roll State Registration — Texas Our Little Miss';
 const description = 'Honor Roll and Winner’s Circle registration for the 2026 Texas Our Little Miss State Universal Beauty Competition.';
 
