@@ -76,6 +76,7 @@ export default async function submitRegistration(request: Request) {
       record.lastError = error instanceof Error ? error.message.slice(0, 1_000) : 'Unknown QuickBooks error';
       await saveRegistration(record).catch(() => undefined);
       console.error('QuickBooks invoice creation failed.', error);
+      if (error instanceof HttpError) return errorResponse(error, 'The QuickBooks invoice could not be created.');
       return json('Your registration was saved, but the QuickBooks invoice could not be created. Please try again in a moment.', 502);
     }
     return errorResponse(error, 'The registration could not be saved. Please try again.');

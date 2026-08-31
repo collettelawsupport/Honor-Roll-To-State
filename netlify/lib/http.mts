@@ -20,15 +20,17 @@ export async function readJsonBody(request: Request, maxLength = 250_000) {
 
 export class HttpError extends Error {
   status: number;
+  details: Record<string, unknown>;
 
-  constructor(message: string, status = 400) {
+  constructor(message: string, status = 400, details: Record<string, unknown> = {}) {
     super(message);
     this.status = status;
+    this.details = details;
   }
 }
 
 export function errorResponse(error: unknown, fallback: string) {
-  if (error instanceof HttpError) return json(error.message, error.status);
+  if (error instanceof HttpError) return json(error.message, error.status, error.details);
   console.error(fallback, error);
   return json(fallback, 500);
 }

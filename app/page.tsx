@@ -117,6 +117,8 @@ export default function RegistrationPage() {
   const [saveStatus, setSaveStatus] = useState('Draft ready');
   const [submissionStatus, setSubmissionStatus] = useState<'idle' | 'submitting'>('idle');
   const [submissionError, setSubmissionError] = useState('');
+  const [submissionSupportUrl, setSubmissionSupportUrl] = useState('');
+  const [submissionReconnectUrl, setSubmissionReconnectUrl] = useState('');
   const formRef = useRef<HTMLFormElement>(null);
 
   useEffect(() => {
@@ -162,6 +164,8 @@ export default function RegistrationPage() {
   const setValue = (name: string, value: string) => {
     setValues((currentValues) => ({ ...currentValues, [name]: value }));
     setSubmissionError('');
+    setSubmissionSupportUrl('');
+    setSubmissionReconnectUrl('');
   };
 
   const scrollToForm = () => {
@@ -192,6 +196,8 @@ export default function RegistrationPage() {
 
   const goBack = () => {
     setSubmissionError('');
+    setSubmissionSupportUrl('');
+    setSubmissionReconnectUrl('');
     setCurrentStep((step) => Math.max(step - 1, 0));
     scrollToForm();
   };
@@ -199,6 +205,8 @@ export default function RegistrationPage() {
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setSubmissionError('');
+    setSubmissionSupportUrl('');
+    setSubmissionReconnectUrl('');
     if (!validateStep()) return;
 
     setSubmissionStatus('submitting');
@@ -216,8 +224,19 @@ export default function RegistrationPage() {
       const result = await response.json().catch(() => ({ message: 'The server returned an unexpected response.' })) as {
         message?: string;
         checkoutUrl?: string;
+        reconnectRequired?: boolean;
+        reconnectUrl?: string;
+        supportUrl?: string;
       };
-      if (!response.ok || !result.checkoutUrl) throw new Error(result.message || 'The QuickBooks invoice could not be started.');
+      if (!response.ok || !result.checkoutUrl) {
+        setSubmissionStatus('idle');
+        setSubmissionError(result.message || 'The QuickBooks invoice could not be started.');
+        if (result.reconnectRequired) {
+          setSubmissionSupportUrl(result.supportUrl || '/support/');
+          setSubmissionReconnectUrl(result.reconnectUrl || '/connect/');
+        }
+        return;
+      }
       window.localStorage.removeItem(STORAGE_KEY);
       window.location.assign(result.checkoutUrl);
     } catch (error) {
@@ -360,6 +379,8 @@ export default function RegistrationPage() {
             <div className="action-meta">
               <span>{saveStatus}</span>
               {submissionError && <p role="alert">{submissionError}</p>}
+              {submissionSupportUrl && <a className="text-link" href={submissionSupportUrl}>Contact registration support</a>}
+              {submissionReconnectUrl && <a className="text-link" href={submissionReconnectUrl}>Texas OLM administrator: reconnect QuickBooks</a>}
             </div>
             <div className="action-buttons">
               {currentStep > 0 && <button className="button-secondary" type="button" onClick={goBack}>Back</button>}

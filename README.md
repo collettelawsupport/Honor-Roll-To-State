@@ -125,6 +125,8 @@ npm run build
 - Repeating a browser submission reuses the saved registration and invoice instead of intentionally creating a second invoice.
 - Intuit webhook signatures are verified with HMAC-SHA256 over the untouched request body.
 - QuickBooks access tokens are refreshed automatically, and each newly rotated refresh token is saved back to Netlify Blobs.
+- Every QuickBooks OAuth and Accounting API response captures Intuit's `intuit_tid` troubleshooting identifier in sanitized Netlify function logs. Request bodies, tokens, credentials, and customer email query values are not logged.
+- An expired or revoked refresh token, or a second API `401` after refresh, clears the unusable credentials and returns a reconnect-required status. The contestant's registration remains saved, the public form directs the family to support, and an administrator can reconnect through `/connect/`.
 - The public status endpoint requires an independent random status token; a registration UUID by itself cannot reveal the invoice link.
 - The full selected entry fee replaces the original deposit line. The paid `$100` or `$75` stays linked to that invoice, so QuickBooks calculates the remaining balance.
 - Payment webhooks verify that the complete entry-specific deposit invoice is paid before sending the private Big Form invitation.

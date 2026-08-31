@@ -1,5 +1,6 @@
 import type { Config } from '@netlify/functions';
 import { HttpError, errorResponse, json, readJsonBody } from '../lib/http.mts';
+import { quickBooksResponseId } from '../lib/quickbooks.mts';
 import { deleteQuickBooksTokens, getQuickBooksTokens } from '../lib/store.mts';
 import { secureEqual } from '../lib/workflow.mts';
 
@@ -35,9 +36,20 @@ export default async function quickBooksDisconnect(request: Request) {
       body: JSON.stringify({ token: tokens.refreshToken }),
     });
 
+    const intuitTid = quickBooksResponseId(response);
+
     if (!response.ok && response.status !== 400) {
+      console.error('QuickBooks token revocation failed.', {
+        status: response.status,
+        ...(intuitTid ? { intuitTid } : {}),
+      });
       throw new Error(`QuickBooks token revocation returned HTTP ${response.status}.`);
     }
+
+    console.info('QuickBooks token revocation completed.', {
+      status: response.status,
+      ...(intuitTid ? { intuitTid } : {}),
+    });
 
     await deleteQuickBooksTokens();
     return json('QuickBooks Online has been disconnected.', 200, { disconnected: true });

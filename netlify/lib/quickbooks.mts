@@ -2,6 +2,7 @@ import { randomBytes } from 'node:crypto';
 import { HttpError } from './http.mts';
 import {
   consumeOauthState,
+  deleteQuickBooksTokens,
   getQuickBooksTokens,
   saveOauthState,
   saveQuickBooksTokens,
@@ -13,6 +14,93 @@ import type { BigFormFeeSummary, RegistrationRecord } from './types.mts';
 const TOKEN_URL = 'https://oauth.platform.intuit.com/oauth2/v1/tokens/bearer';
 const AUTHORIZE_URL = 'https://appcenter.intuit.com/connect/oauth2';
 const MINOR_VERSION = '75';
+
+type QuickBooksFault = {
+  Message?: string;
+  Detail?: string;
+  code?: string;
+  element?: string;
+};
+
+type QuickBooksLogger = Pick<Console, 'info' | 'warn' | 'error'>;
+
+export class QuickBooksOAuthError extends Error {
+  status: number;
+  errorCode: string;
+  intuitTid: string;
+
+  constructor(message: string, status: number, errorCode = '', intuitTid = '') {
+    super(message);
+    this.name = 'QuickBooksOAuthError';
+    this.status = status;
+    this.errorCode = errorCode;
+    this.intuitTid = intuitTid;
+  }
+}
+
+export class QuickBooksApiError extends Error {
+  status: number;
+  intuitTid: string;
+  faults: QuickBooksFault[];
+
+  constructor(message: string, status: number, intuitTid = '', faults: QuickBooksFault[] = []) {
+    super(message);
+    this.name = 'QuickBooksApiError';
+    this.status = status;
+    this.intuitTid = intuitTid;
+    this.faults = faults;
+  }
+}
+
+export class QuickBooksReconnectRequiredError extends HttpError {
+  intuitTid: string;
+
+  constructor(intuitTid = '') {
+    super(
+      'QuickBooks Online needs administrator attention before the invoice can be created or updated. Your registration is saved; please contact registration support.',
+      503,
+      {
+        errorCode: 'QBO_RECONNECT_REQUIRED',
+        reconnectRequired: true,
+        reconnectUrl: '/connect/',
+        supportUrl: '/support/',
+        ...(intuitTid ? { intuitTid } : {}),
+      },
+    );
+    this.name = 'QuickBooksReconnectRequiredError';
+    this.intuitTid = intuitTid;
+  }
+}
+
+export function quickBooksResponseId(response: Response) {
+  return response.headers.get('intuit_tid') || response.headers.get('intuit-tid') || '';
+}
+
+function safeEndpoint(path: string) {
+  const url = new URL(path, 'https://quickbooks.invalid');
+  return url.pathname.replace(/\/\d+(?=\/|$)/g, '/:id');
+}
+
+function faultsFrom(result: unknown) {
+  if (!result || typeof result !== 'object' || !('Fault' in result)) return [];
+  const fault = result.Fault as { Error?: QuickBooksFault[] };
+  return Array.isArray(fault.Error) ? fault.Error : [];
+}
+
+function reconnectRequired(error: unknown) {
+  return error instanceof QuickBooksOAuthError
+    && ['invalid_grant', 'invalid_token'].includes(error.errorCode.toLowerCase());
+}
+
+function logContext(response: Response, operation: string, extra: Record<string, unknown> = {}) {
+  const intuitTid = quickBooksResponseId(response);
+  return {
+    operation,
+    status: response.status,
+    ...(intuitTid ? { intuitTid } : {}),
+    ...extra,
+  };
+}
 
 function requiredEnv(name: string) {
   const value = process.env[name]?.trim();
@@ -46,9 +134,15 @@ async function tokenRequest(body: URLSearchParams, realmId: string) {
     body,
   });
   const result = await response.json().catch(() => ({})) as Record<string, unknown>;
+  const operation = body.get('grant_type') === 'refresh_token' ? 'refresh_token' : 'authorization_code';
+  const context = logContext(response, operation);
   if (!response.ok || typeof result.access_token !== 'string' || typeof result.refresh_token !== 'string') {
-    throw new Error(`QuickBooks authorization failed: ${String(result.error_description || result.error || response.statusText)}`);
+    const errorCode = typeof result.error === 'string' ? result.error : '';
+    const message = `QuickBooks authorization failed: ${String(result.error_description || errorCode || response.statusText)}`;
+    console.error('QuickBooks OAuth request failed.', { ...context, errorCode, message });
+    throw new QuickBooksOAuthError(message, response.status, errorCode, quickBooksResponseId(response));
   }
+  console.info('QuickBooks OAuth request completed.', context);
   const now = Date.now();
   const tokens: QuickBooksTokens = {
     accessToken: result.access_token,
@@ -60,14 +154,36 @@ async function tokenRequest(body: URLSearchParams, realmId: string) {
   return saveQuickBooksTokens(tokens);
 }
 
+export async function refreshQuickBooksTokens(
+  saved: QuickBooksTokens,
+  requestTokens: (body: URLSearchParams, realmId: string) => Promise<QuickBooksTokens> = tokenRequest,
+  clearTokens: () => Promise<void> = deleteQuickBooksTokens,
+  logger: QuickBooksLogger = console,
+) {
+  if (saved.refreshTokenExpiresAt && saved.refreshTokenExpiresAt <= Date.now()) {
+    await clearTokens();
+    logger.warn('QuickBooks refresh token has expired. Reconnect at /connect/.');
+    throw new QuickBooksReconnectRequiredError();
+  }
+  try {
+    return await requestTokens(new URLSearchParams({
+      grant_type: 'refresh_token',
+      refresh_token: saved.refreshToken,
+    }), saved.realmId);
+  } catch (error) {
+    if (!reconnectRequired(error)) throw error;
+    await clearTokens();
+    const intuitTid = error instanceof QuickBooksOAuthError ? error.intuitTid : '';
+    logger.warn('QuickBooks authorization is no longer valid. Reconnect at /connect/.', intuitTid ? { intuitTid } : undefined);
+    throw new QuickBooksReconnectRequiredError(intuitTid);
+  }
+}
+
 async function accessTokens() {
   const saved = await getQuickBooksTokens();
-  if (!saved?.realmId || !saved.refreshToken) throw new Error('QuickBooks Online has not been connected yet.');
+  if (!saved?.realmId || !saved.refreshToken) throw new QuickBooksReconnectRequiredError();
   if (saved.accessToken && saved.expiresAt > Date.now() + 5 * 60 * 1_000) return saved;
-  return tokenRequest(new URLSearchParams({
-    grant_type: 'refresh_token',
-    refresh_token: saved.refreshToken,
-  }), saved.realmId);
+  return refreshQuickBooksTokens(saved);
 }
 
 export async function quickBooksAuthorizationUrl() {
@@ -95,35 +211,68 @@ export async function completeQuickBooksAuthorization(code: string, realmId: str
 }
 
 function quickBooksError(result: unknown, status: number) {
-  if (result && typeof result === 'object' && 'Fault' in result) {
-    const fault = result.Fault as { Error?: Array<{ Message?: string; Detail?: string; code?: string }> };
-    const first = fault.Error?.[0];
+  const faults = faultsFrom(result);
+  if (faults.length) {
+    const first = faults[0];
     if (first) return `${first.Message || 'QuickBooks rejected the request'}${first.Detail ? `: ${first.Detail}` : ''}${first.code ? ` (${first.code})` : ''}`;
   }
   return `QuickBooks returned HTTP ${status}.`;
 }
 
+export async function executeQuickBooksRequest<T>(
+  initialTokens: QuickBooksTokens,
+  path: string,
+  init: RequestInit,
+  request: (tokens: QuickBooksTokens) => Promise<Response>,
+  refresh: (tokens: QuickBooksTokens) => Promise<QuickBooksTokens>,
+  clearTokens: () => Promise<void>,
+  logger: QuickBooksLogger = console,
+) {
+  let tokens = initialTokens;
+  let response = await request(tokens);
+  if (response.status === 401) {
+    logger.warn('QuickBooks rejected an access token; refreshing once.', logContext(response, 'accounting_api', {
+      method: init.method || 'GET',
+      endpoint: safeEndpoint(path),
+    }));
+    tokens = await refresh(tokens);
+    response = await request(tokens);
+    if (response.status === 401) {
+      const intuitTid = quickBooksResponseId(response);
+      await clearTokens();
+      logger.error('QuickBooks rejected the refreshed access token. Reconnect at /connect/.', logContext(response, 'accounting_api', {
+        method: init.method || 'GET',
+        endpoint: safeEndpoint(path),
+      }));
+      throw new QuickBooksReconnectRequiredError(intuitTid);
+    }
+  }
+
+  const result = await response.json().catch(() => ({})) as T;
+  const context = logContext(response, 'accounting_api', {
+    method: init.method || 'GET',
+    endpoint: safeEndpoint(path),
+  });
+  if (!response.ok) {
+    const faults = faultsFrom(result);
+    const message = quickBooksError(result, response.status);
+    logger.error('QuickBooks API request failed.', { ...context, faults, message });
+    throw new QuickBooksApiError(message, response.status, quickBooksResponseId(response), faults);
+  }
+  logger.info('QuickBooks API request completed.', context);
+  return result;
+}
+
 export async function qboRequest<T>(path: string, init: RequestInit = {}) {
-  let tokens = await accessTokens();
-  const request = async (accessToken: string) => {
+  const tokens = await accessTokens();
+  const request = async (activeTokens: QuickBooksTokens) => {
     const headers = new Headers(init.headers);
-    headers.set('authorization', `Bearer ${accessToken}`);
+    headers.set('authorization', `Bearer ${activeTokens.accessToken}`);
     headers.set('accept', 'application/json');
     if (init.body) headers.set('content-type', 'application/json');
-    return fetch(`${apiBase()}/v3/company/${tokens.realmId}${path}`, { ...init, headers });
+    return fetch(`${apiBase()}/v3/company/${activeTokens.realmId}${path}`, { ...init, headers });
   };
-
-  let response = await request(tokens.accessToken);
-  if (response.status === 401) {
-    tokens = await tokenRequest(new URLSearchParams({
-      grant_type: 'refresh_token',
-      refresh_token: tokens.refreshToken,
-    }), tokens.realmId);
-    response = await request(tokens.accessToken);
-  }
-  const result = await response.json().catch(() => ({})) as T;
-  if (!response.ok) throw new Error(quickBooksError(result, response.status));
-  return result;
+  return executeQuickBooksRequest<T>(tokens, path, init, request, refreshQuickBooksTokens, deleteQuickBooksTokens);
 }
 
 export async function createCustomer(record: RegistrationRecord) {

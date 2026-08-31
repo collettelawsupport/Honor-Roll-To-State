@@ -2,6 +2,13 @@ import assert from 'node:assert/strict';
 import { createHmac } from 'node:crypto';
 import test from 'node:test';
 import {
+  executeQuickBooksRequest,
+  QuickBooksApiError,
+  QuickBooksOAuthError,
+  QuickBooksReconnectRequiredError,
+  refreshQuickBooksTokens,
+} from '../netlify/lib/quickbooks.mts';
+import {
   buildDepositInvoice,
   buildBigFormUrl,
   buildFinalInvoiceLines,
@@ -10,6 +17,21 @@ import {
   verifyWebhookSignature,
 } from '../netlify/lib/workflow.mts';
 import type { RegistrationRecord } from '../netlify/lib/types.mts';
+import type { QuickBooksTokens } from '../netlify/lib/store.mts';
+
+const quietLogger = {
+  info: () => undefined,
+  warn: () => undefined,
+  error: () => undefined,
+};
+
+const quickBooksTokens: QuickBooksTokens = {
+  accessToken: 'expired-access-token',
+  refreshToken: 'valid-refresh-token',
+  expiresAt: 0,
+  refreshTokenExpiresAt: Date.now() + 60_000,
+  realmId: '123456789',
+};
 
 const values = {
   contestant_first_name: 'Taylor',
@@ -107,4 +129,159 @@ test('verifies Intuit webhook signatures over the raw body', () => {
   const signature = createHmac('sha256', token).update(body).digest('base64');
   assert.equal(verifyWebhookSignature(body, signature, token), true);
   assert.equal(verifyWebhookSignature(`${body} `, signature, token), false);
+});
+
+test('preserves QuickBooks validation faults and the intuit_tid for troubleshooting', async () => {
+  const response = new Response(JSON.stringify({
+    Fault: {
+      Error: [{
+        Message: 'Validation Fault',
+        Detail: 'Invalid Reference Id',
+        code: '2500',
+        element: 'CustomerRef',
+      }],
+    },
+  }), {
+    status: 400,
+    headers: { 'content-type': 'application/json', intuit_tid: 'validation-tid-123' },
+  });
+
+  await assert.rejects(
+    () => executeQuickBooksRequest(
+      quickBooksTokens,
+      '/invoice?minorversion=75',
+      { method: 'POST' },
+      async () => response,
+      async () => quickBooksTokens,
+      async () => undefined,
+      quietLogger,
+    ),
+    (error: unknown) => {
+      assert.ok(error instanceof QuickBooksApiError);
+      assert.equal(error.status, 400);
+      assert.equal(error.intuitTid, 'validation-tid-123');
+      assert.equal(error.faults[0]?.code, '2500');
+      assert.match(error.message, /Invalid Reference Id/);
+      return true;
+    },
+  );
+});
+
+test('refreshes once after a QuickBooks 401 and retries with the rotated access token', async () => {
+  const refreshed = { ...quickBooksTokens, accessToken: 'fresh-access-token', expiresAt: Date.now() + 3_600_000 };
+  const requestedTokens: string[] = [];
+  let refreshCount = 0;
+
+  const result = await executeQuickBooksRequest<{ Invoice: { Id: string } }>(
+    quickBooksTokens,
+    '/invoice/99?minorversion=75',
+    {},
+    async (tokens) => {
+      requestedTokens.push(tokens.accessToken);
+      return tokens.accessToken === 'fresh-access-token'
+        ? new Response(JSON.stringify({ Invoice: { Id: '99' } }), { status: 200, headers: { intuit_tid: 'success-tid-456' } })
+        : new Response('{}', { status: 401, headers: { intuit_tid: 'expired-tid-123' } });
+    },
+    async () => {
+      refreshCount += 1;
+      return refreshed;
+    },
+    async () => assert.fail('Valid refreshed credentials must not be cleared.'),
+    quietLogger,
+  );
+
+  assert.equal(result.Invoice.Id, '99');
+  assert.deepEqual(requestedTokens, ['expired-access-token', 'fresh-access-token']);
+  assert.equal(refreshCount, 1);
+});
+
+test('requires reconnection after QuickBooks rejects the refreshed access token', async () => {
+  const refreshed = { ...quickBooksTokens, accessToken: 'still-rejected', expiresAt: Date.now() + 3_600_000 };
+  let cleared = false;
+
+  await assert.rejects(
+    () => executeQuickBooksRequest(
+      quickBooksTokens,
+      '/customer?minorversion=75',
+      { method: 'POST' },
+      async () => new Response('{}', { status: 401, headers: { intuit_tid: 'reconnect-tid-789' } }),
+      async () => refreshed,
+      async () => { cleared = true; },
+      quietLogger,
+    ),
+    (error: unknown) => {
+      assert.ok(error instanceof QuickBooksReconnectRequiredError);
+      assert.equal(error.intuitTid, 'reconnect-tid-789');
+      assert.equal(error.details.reconnectRequired, true);
+      return true;
+    },
+  );
+  assert.equal(cleared, true);
+});
+
+test('clears an invalid refresh token and returns a reconnect-required error', async () => {
+  let cleared = false;
+
+  await assert.rejects(
+    () => refreshQuickBooksTokens(
+      quickBooksTokens,
+      async () => {
+        throw new QuickBooksOAuthError(
+          'QuickBooks authorization failed: refresh token is invalid',
+          400,
+          'invalid_grant',
+          'oauth-tid-321',
+        );
+      },
+      async () => { cleared = true; },
+      quietLogger,
+    ),
+    (error: unknown) => {
+      assert.ok(error instanceof QuickBooksReconnectRequiredError);
+      assert.equal(error.intuitTid, 'oauth-tid-321');
+      assert.equal(error.details.reconnectUrl, '/connect/');
+      assert.equal(error.details.supportUrl, '/support/');
+      return true;
+    },
+  );
+  assert.equal(cleared, true);
+});
+
+test('does not discard credentials for a transient OAuth service error', async () => {
+  let cleared = false;
+  const transient = new QuickBooksOAuthError('QuickBooks authorization failed: unavailable', 503, 'temporarily_unavailable', 'oauth-tid-503');
+
+  await assert.rejects(
+    () => refreshQuickBooksTokens(
+      quickBooksTokens,
+      async () => { throw transient; },
+      async () => { cleared = true; },
+      quietLogger,
+    ),
+    (error: unknown) => error === transient,
+  );
+  assert.equal(cleared, false);
+});
+
+test('logs the intuit_tid without logging a QuickBooks invoice recipient email address', async () => {
+  const logged: Array<Record<string, unknown>> = [];
+  const logger = {
+    info: (_message: unknown, context: Record<string, unknown>) => { logged.push(context); },
+    warn: () => undefined,
+    error: () => undefined,
+  };
+
+  await executeQuickBooksRequest(
+    quickBooksTokens,
+    '/invoice/99/send?sendTo=parent@example.com&minorversion=75',
+    { method: 'POST' },
+    async () => new Response('{}', { status: 200, headers: { intuit_tid: 'send-tid-654' } }),
+    async () => quickBooksTokens,
+    async () => undefined,
+    logger,
+  );
+
+  assert.equal(logged[0]?.intuitTid, 'send-tid-654');
+  assert.equal(logged[0]?.endpoint, '/invoice/:id/send');
+  assert.doesNotMatch(JSON.stringify(logged), /parent@example\.com/);
 });
