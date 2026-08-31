@@ -375,7 +375,11 @@ export default function RegistrationPage() {
         </form>
       </div>
 
-      <footer><span>Texas Our Little Miss</span><small>Natural beauty · Poise · Confidence · Scholarship</small></footer>
+      <footer>
+        <span>Texas Our Little Miss</span>
+        <nav aria-label="Legal and support links"><a href="/privacy/">Privacy</a><a href="/terms/">Terms</a><a href="/support/">Support</a></nav>
+        <small>Natural beauty · Poise · Confidence · Scholarship</small>
+      </footer>
     </main>
   );
 }

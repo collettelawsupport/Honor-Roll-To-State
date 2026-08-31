@@ -55,6 +55,16 @@ Subscribe to `Payment` and `Invoice` events. Copy Intuit's webhook verifier toke
 
 After the first Netlify deployment, visit `/connect/`, enter `QBO_SETUP_KEY`, sign in to Intuit, and authorize the correct QuickBooks company. The callback stores the rotating OAuth credentials in Netlify Blobs.
 
+The production Intuit app can use these public application URLs:
+
+- Privacy policy: `/privacy/`
+- End-user terms: `/terms/`
+- Support: `/support/`
+- Connect/reconnect: `/connect/`
+- Disconnect: `/disconnect/`
+
+The disconnect page requires `QBO_SETUP_KEY`, revokes the Intuit refresh token, and removes the saved OAuth credentials from Netlify Blobs.
+
 QuickBooks returns an online payment link only when online payments are enabled for the company, the invoice permits online payment, and the customer has a valid email address. The integration requests the link with `include=invoiceLink` and otherwise falls back to the confirmation page while the emailed invoice remains usable.
 
 ## Connect the existing Big Form

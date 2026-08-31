@@ -68,3 +68,7 @@ export async function saveQuickBooksTokens(tokens: QuickBooksTokens) {
   await store().setJSON('quickbooks/oauth.json', tokens);
   return tokens;
 }
+
+export async function deleteQuickBooksTokens() {
+  await store().delete('quickbooks/oauth.json');
+}
