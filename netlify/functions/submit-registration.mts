@@ -2,6 +2,7 @@ import { randomBytes, randomUUID } from 'node:crypto';
 import type { Config } from '@netlify/functions';
 import { HttpError, errorResponse, json, readJsonBody } from '../lib/http.mts';
 import {
+  assertRegistrationWorkflowReady,
   createCustomer,
   createDepositInvoice,
   registrationFallbackUrl,
@@ -51,6 +52,7 @@ export default async function submitRegistration(request: Request) {
     }
     const submissionKey = normalizeSubmissionKey('submissionKey' in parsed ? parsed.submissionKey : null);
     const normalized = normalizeRegistrationValues('values' in parsed ? parsed.values : null);
+    await assertRegistrationWorkflowReady();
     record = await getRegistrationByRequest(submissionKey);
     if (!record) {
       const now = new Date().toISOString();

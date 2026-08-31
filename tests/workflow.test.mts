@@ -2,7 +2,9 @@ import assert from 'node:assert/strict';
 import { createHmac } from 'node:crypto';
 import test from 'node:test';
 import {
+  assertRegistrationWorkflowReady,
   executeQuickBooksRequest,
+  missingRegistrationWorkflowSettings,
   QuickBooksApiError,
   QuickBooksOAuthError,
   QuickBooksReconnectRequiredError,
@@ -284,4 +286,51 @@ test('logs the intuit_tid without logging a QuickBooks invoice recipient email a
   assert.equal(logged[0]?.intuitTid, 'send-tid-654');
   assert.equal(logged[0]?.endpoint, '/invoice/:id/send');
   assert.doesNotMatch(JSON.stringify(logged), /parent@example\.com/);
+});
+
+test('blocks registration before storing contestant data when workflow settings are incomplete', async () => {
+  const missing = missingRegistrationWorkflowSettings({ QBO_ENVIRONMENT: 'staging' });
+  assert.ok(missing.includes('QBO_CLIENT_ID'));
+  assert.ok(missing.includes('QBO_ENVIRONMENT'));
+
+  await assert.rejects(
+    () => assertRegistrationWorkflowReady(
+      { QBO_ENVIRONMENT: 'staging' },
+      async () => quickBooksTokens,
+      quietLogger,
+    ),
+    (error: unknown) => {
+      assert.ok(error instanceof Error);
+      assert.match(error.message, /temporarily unavailable/i);
+      return true;
+    },
+  );
+});
+
+test('requires QuickBooks authorization after all workflow settings are configured', async () => {
+  const environment = Object.fromEntries([
+    'QBO_CLIENT_ID',
+    'QBO_CLIENT_SECRET',
+    'QBO_SETUP_KEY',
+    'QBO_WEBHOOK_VERIFIER_TOKEN',
+    'QBO_REGISTRATION_ITEM_ID',
+    'QBO_OPTIONAL_ITEM_ID',
+    'BIG_FORM_URL',
+    'BIG_FORM_CALLBACK_SECRET',
+    'REGISTRATION_ENABLED',
+  ].map((name) => [name, 'configured'])) as Record<string, string>;
+  environment.QBO_ENVIRONMENT = 'sandbox';
+  environment.REGISTRATION_ENABLED = 'true';
+
+  await assert.rejects(
+    () => assertRegistrationWorkflowReady(environment, async () => null, quietLogger),
+    (error: unknown) => {
+      assert.ok(error instanceof QuickBooksReconnectRequiredError);
+      assert.equal(error.details.reconnectRequired, true);
+      return true;
+    },
+  );
+  await assert.doesNotReject(
+    () => assertRegistrationWorkflowReady(environment, async () => quickBooksTokens, quietLogger),
+  );
 });

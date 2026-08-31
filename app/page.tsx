@@ -119,6 +119,10 @@ export default function RegistrationPage() {
   const [submissionError, setSubmissionError] = useState('');
   const [submissionSupportUrl, setSubmissionSupportUrl] = useState('');
   const [submissionReconnectUrl, setSubmissionReconnectUrl] = useState('');
+  const [workflowAvailability, setWorkflowAvailability] = useState<'checking' | 'ready' | 'unavailable'>('checking');
+  const [workflowAvailabilityMessage, setWorkflowAvailabilityMessage] = useState('Checking the secure QuickBooks invoice connection…');
+  const [workflowSupportUrl, setWorkflowSupportUrl] = useState('/support/');
+  const [workflowReconnectUrl, setWorkflowReconnectUrl] = useState('');
   const formRef = useRef<HTMLFormElement>(null);
 
   useEffect(() => {
@@ -143,6 +147,36 @@ export default function RegistrationPage() {
       }
     }, 0);
     return () => window.clearTimeout(timer);
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    fetch('/api/registration-readiness', { cache: 'no-store' })
+      .then(async (response) => {
+        const result = await response.json().catch(() => ({})) as {
+          message?: string;
+          workflowReady?: boolean;
+          reconnectRequired?: boolean;
+          reconnectUrl?: string;
+          supportUrl?: string;
+        };
+        if (!active) return;
+        if (response.ok && result.workflowReady) {
+          setWorkflowAvailability('ready');
+          setWorkflowAvailabilityMessage('Secure QuickBooks invoicing is ready.');
+          return;
+        }
+        setWorkflowAvailability('unavailable');
+        setWorkflowAvailabilityMessage(result.message || 'Online invoice registration is temporarily unavailable.');
+        setWorkflowSupportUrl(result.supportUrl || '/support/');
+        if (result.reconnectRequired) setWorkflowReconnectUrl(result.reconnectUrl || '/connect/');
+      })
+      .catch(() => {
+        if (!active) return;
+        setWorkflowAvailability('unavailable');
+        setWorkflowAvailabilityMessage('Online invoice registration is temporarily unavailable. Please contact registration support.');
+      });
+    return () => { active = false; };
   }, []);
 
   useEffect(() => {
@@ -282,6 +316,15 @@ export default function RegistrationPage() {
             ))}
           </nav>
 
+          {workflowAvailability !== 'ready' && (
+            <article className="info-panel important-panel" role="status">
+              <h3>{workflowAvailability === 'checking' ? 'Checking invoice connection' : 'Online registration temporarily paused'}</h3>
+              <p>{workflowAvailabilityMessage}</p>
+              {workflowAvailability === 'unavailable' && <p><a className="text-link" href={workflowSupportUrl}>Contact registration support</a></p>}
+              {workflowReconnectUrl && <p><a className="text-link" href={workflowReconnectUrl}>Texas OLM administrator: reconnect QuickBooks</a></p>}
+            </article>
+          )}
+
           <section data-step="0" hidden={currentStep !== 0} aria-labelledby="step-0-title">
             <div className="section-heading">
               <p>Step 1 of 3</p>
@@ -387,8 +430,14 @@ export default function RegistrationPage() {
               {currentStep < registrationSteps.length - 1 ? (
                 <button className="button-primary" type="button" onClick={goNext}>Continue <span aria-hidden="true">→</span></button>
               ) : (
-                <button className="button-primary" type="submit" disabled={submissionStatus === 'submitting'}>
-                  {submissionStatus === 'submitting' ? 'Creating invoice…' : `Continue to ${selectedEntry ? formatCurrency(selectedEntry.depositCents) : 'deposit'} invoice`}
+                <button className="button-primary" type="submit" disabled={submissionStatus === 'submitting' || workflowAvailability !== 'ready'}>
+                  {submissionStatus === 'submitting'
+                    ? 'Creating invoice…'
+                    : workflowAvailability === 'checking'
+                      ? 'Checking invoice connection…'
+                      : workflowAvailability === 'unavailable'
+                        ? 'Online registration temporarily paused'
+                        : `Continue to ${selectedEntry ? formatCurrency(selectedEntry.depositCents) : 'deposit'} invoice`}
                 </button>
               )}
             </div>

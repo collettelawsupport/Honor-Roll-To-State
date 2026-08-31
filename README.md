@@ -27,7 +27,8 @@ Unknown or pending prices are deliberately left off the updated invoice and iden
 1. Import this GitHub repository in Netlify.
 2. Netlify reads `netlify.toml`, runs `npm run build`, and publishes `out`.
 3. Copy every variable from `.env.example` into **Netlify → Project configuration → Environment variables**.
-4. Redeploy after setting the variables.
+4. Keep `REGISTRATION_ENABLED=false` while configuring and testing the workflow.
+5. Redeploy after setting the variables. Change `REGISTRATION_ENABLED=true` only after the complete sandbox test passes and the production connection is ready.
 
 The dedicated production build falls back to `https://honorrollregistration.texasourlittlemiss.net` for public metadata and application links. `NEXT_PUBLIC_SITE_URL` should still be set to that same value in Netlify so the deployment configuration remains explicit.
 
@@ -129,6 +130,7 @@ npm run build
 - QuickBooks access tokens are refreshed automatically, and each newly rotated refresh token is saved back to Netlify Blobs.
 - Every QuickBooks OAuth and Accounting API response captures Intuit's `intuit_tid` troubleshooting identifier in sanitized Netlify function logs. Request bodies, tokens, credentials, and customer email query values are not logged.
 - An expired or revoked refresh token, or a second API `401` after refresh, clears the unusable credentials and returns a reconnect-required status. The contestant's registration remains saved, the public form directs the family to support, and an administrator can reconnect through `/connect/`.
+- The public form checks `/api/registration-readiness` before allowing submission. If required QuickBooks or Big Form settings are missing, or QuickBooks is disconnected, registration is visibly paused and no new contestant record is stored.
 - The public status endpoint requires an independent random status token; a registration UUID by itself cannot reveal the invoice link.
 - The full selected entry fee replaces the original deposit line. The paid `$100` or `$75` stays linked to that invoice, so QuickBooks calculates the remaining balance.
 - Payment webhooks verify that the complete entry-specific deposit invoice is paid before sending the private Big Form invitation.

@@ -15,6 +15,18 @@ const TOKEN_URL = 'https://oauth.platform.intuit.com/oauth2/v1/tokens/bearer';
 const AUTHORIZE_URL = 'https://appcenter.intuit.com/connect/oauth2';
 const MINOR_VERSION = '75';
 const PRODUCTION_SITE_URL = 'https://honorrollregistration.texasourlittlemiss.net';
+const REQUIRED_WORKFLOW_SETTINGS = [
+  'QBO_CLIENT_ID',
+  'QBO_CLIENT_SECRET',
+  'QBO_ENVIRONMENT',
+  'QBO_SETUP_KEY',
+  'QBO_WEBHOOK_VERIFIER_TOKEN',
+  'QBO_REGISTRATION_ITEM_ID',
+  'QBO_OPTIONAL_ITEM_ID',
+  'BIG_FORM_URL',
+  'BIG_FORM_CALLBACK_SECRET',
+  'REGISTRATION_ENABLED',
+] as const;
 
 type QuickBooksFault = {
   Message?: string;
@@ -58,7 +70,7 @@ export class QuickBooksReconnectRequiredError extends HttpError {
 
   constructor(intuitTid = '') {
     super(
-      'QuickBooks Online needs administrator attention before the invoice can be created or updated. Your registration is saved; please contact registration support.',
+      'QuickBooks Online needs administrator attention before an invoice can be created or updated. Please contact registration support.',
       503,
       {
         errorCode: 'QBO_RECONNECT_REQUIRED',
@@ -71,6 +83,37 @@ export class QuickBooksReconnectRequiredError extends HttpError {
     this.name = 'QuickBooksReconnectRequiredError';
     this.intuitTid = intuitTid;
   }
+}
+
+export function missingRegistrationWorkflowSettings(environment: Record<string, string | undefined>) {
+  const missing = REQUIRED_WORKFLOW_SETTINGS.filter((name) => !environment[name]?.trim());
+  const qboEnvironment = environment.QBO_ENVIRONMENT?.trim();
+  if (qboEnvironment && !['sandbox', 'production'].includes(qboEnvironment)) missing.push('QBO_ENVIRONMENT');
+  if (environment.REGISTRATION_ENABLED?.trim().toLowerCase() !== 'true') missing.push('REGISTRATION_ENABLED');
+  return [...new Set(missing)];
+}
+
+export async function assertRegistrationWorkflowReady(
+  environment: Record<string, string | undefined> = process.env,
+  loadTokens: () => Promise<QuickBooksTokens | null> = getQuickBooksTokens,
+  logger: QuickBooksLogger = console,
+) {
+  const missing = missingRegistrationWorkflowSettings(environment);
+  if (missing.length) {
+    logger.warn('Honor Roll registration workflow configuration is incomplete.', { missing });
+    throw new HttpError(
+      'Online invoice registration is temporarily unavailable while setup is completed. Please contact registration support.',
+      503,
+      {
+        errorCode: 'REGISTRATION_WORKFLOW_NOT_READY',
+        workflowReady: false,
+        supportUrl: '/support/',
+      },
+    );
+  }
+  const tokens = await loadTokens();
+  if (!tokens?.realmId || !tokens.refreshToken) throw new QuickBooksReconnectRequiredError();
+  if (tokens.refreshTokenExpiresAt && tokens.refreshTokenExpiresAt <= Date.now()) throw new QuickBooksReconnectRequiredError();
 }
 
 export function quickBooksResponseId(response: Response) {
