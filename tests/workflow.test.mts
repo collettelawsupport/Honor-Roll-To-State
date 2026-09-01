@@ -131,6 +131,20 @@ test('routes the paid Big Form invitation back to the Honor Roll workflow', () =
   assert.equal(url.searchParams.get('workflow'), 'honor_roll');
 });
 
+test('accepts a Big Form host without an explicit protocol', () => {
+  const url = new URL(buildBigFormUrl(record, 'bigforms.texasourlittlemiss.net'));
+  assert.equal(url.origin, 'https://bigforms.texasourlittlemiss.net');
+  assert.equal(url.searchParams.get('registration'), record.id);
+  assert.equal(url.searchParams.get('workflow_token'), record.workflowToken);
+});
+
+test('rejects a non-web Big Form URL', () => {
+  assert.throws(
+    () => buildBigFormUrl(record, 'javascript:alert(1)'),
+    /must use HTTP or HTTPS/i,
+  );
+});
+
 test('does not expose unusable QuickBooks sandbox invoice links', () => {
   assert.equal(
     publicQuickBooksInvoiceUrl('https://developer.intuit.com/app/developer/sandbox', 'sandbox'),

@@ -165,7 +165,14 @@ export function buildFinalInvoiceLines(record: RegistrationRecord, fees: BigForm
 }
 
 export function buildBigFormUrl(record: RegistrationRecord, baseUrl: string) {
-  const url = new URL(baseUrl);
+  const trimmedBaseUrl = baseUrl.trim();
+  const normalizedBaseUrl = /^[a-z][a-z\d+.-]*:/i.test(trimmedBaseUrl)
+    ? trimmedBaseUrl
+    : `https://${trimmedBaseUrl}`;
+  const url = new URL(normalizedBaseUrl);
+  if (!['http:', 'https:'].includes(url.protocol)) {
+    throw new Error('BIG_FORM_URL must use HTTP or HTTPS.');
+  }
   url.searchParams.set('registration', record.id);
   url.searchParams.set('workflow_token', record.workflowToken);
   url.searchParams.set('workflow', 'honor_roll');
