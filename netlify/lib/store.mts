@@ -38,6 +38,22 @@ export async function getRegistrationByInvoice(invoiceId: string) {
   return mapping?.registrationId ? getRegistration(mapping.registrationId) : null;
 }
 
+export async function listRegistrationInvoicesAwaitingInvitation(limit = 25) {
+  const listed = await store().list({ prefix: 'invoices/' });
+  const keys = listed.blobs.map((blob) => blob.key).sort();
+  if (!keys.length) return [];
+
+  const result: string[] = [];
+  const start = Math.floor(Date.now() / (5 * 60 * 1000)) % keys.length;
+  for (let offset = 0; offset < keys.length && result.length < limit; offset += 1) {
+    const key = keys[(start + offset) % keys.length];
+    const invoiceId = key.slice('invoices/'.length).replace(/\.json$/, '');
+    const record = await getRegistrationByInvoice(invoiceId);
+    if (record?.qbo?.invoiceId && !record.bigFormInvitationSentAt) result.push(invoiceId);
+  }
+  return result;
+}
+
 export async function saveOauthState(state: string) {
   await store().setJSON(`oauth-states/${state}.json`, { createdAt: new Date().toISOString() }, { onlyIfNew: true });
 }

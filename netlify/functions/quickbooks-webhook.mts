@@ -1,14 +1,8 @@
 import type { Config, Context } from '@netlify/functions';
-import { sendBigFormInvitation } from '../lib/email.mts';
 import { json } from '../lib/http.mts';
-import {
-  connectedRealmId,
-  getInvoice,
-  getPayment,
-  updatePaidInvoiceMessage,
-} from '../lib/quickbooks.mts';
-import { getRegistrationByInvoice, saveRegistration } from '../lib/store.mts';
-import { buildBigFormUrl, verifyWebhookSignature } from '../lib/workflow.mts';
+import { reconcilePaidInvoice } from '../lib/paid-registration.mts';
+import { connectedRealmId, getPayment } from '../lib/quickbooks.mts';
+import { verifyWebhookSignature } from '../lib/workflow.mts';
 
 type WebhookEntity = { id?: string; name?: string; operation?: string };
 
@@ -35,54 +29,12 @@ function paymentInvoiceIds(payment: Record<string, unknown>) {
   return result;
 }
 
-async function sendPaidInvitation(invoiceId: string) {
-  const record = await getRegistrationByInvoice(invoiceId);
-  if (!record) return;
-  if (!record.paidAt) {
-    record.paidAt = new Date().toISOString();
-    record.status = 'paid';
-    await saveRegistration(record);
-  }
-  if (record.bigFormInvitationSentAt) return;
-
-  const baseUrl = process.env.BIG_FORM_URL?.trim();
-  if (!baseUrl) throw new Error('BIG_FORM_URL is not configured.');
-  const bigFormUrl = buildBigFormUrl(record, baseUrl);
-  const sentByResend = await sendBigFormInvitation(record, bigFormUrl);
-  if (sentByResend) {
-    record.bigFormInvitationMethod = 'resend';
-  } else {
-    const invoice = await updatePaidInvoiceMessage(record, bigFormUrl);
-    record.qbo = { ...record.qbo, ...invoice };
-    record.bigFormInvitationMethod = 'quickbooks';
-  }
-  record.bigFormInvitationSentAt = new Date().toISOString();
-  await saveRegistration(record);
-}
-
 async function processInvoice(invoiceId: string) {
-  const record = await getRegistrationByInvoice(invoiceId);
-  if (!record) return;
-
   for (let attempt = 0; attempt < PAYMENT_RETRY_DELAYS_MS.length; attempt += 1) {
     const delay = PAYMENT_RETRY_DELAYS_MS[attempt];
     if (delay) await wait(delay);
-
-    const invoice = await getInvoice(invoiceId);
-    const total = Number(invoice.TotalAmt || 0);
-    const balance = Number(invoice.Balance || 0);
-    console.info('QuickBooks invoice payment check completed.', {
-      invoiceId,
-      attempt: attempt + 1,
-      total,
-      balance,
-    });
-
-    if (total >= record.depositCents / 100 && balance <= 0) {
-      await sendPaidInvitation(invoiceId);
-      console.info('QuickBooks paid-registration invitation completed.', { invoiceId });
-      return;
-    }
+    const result = await reconcilePaidInvoice(invoiceId, 'webhook');
+    if (result !== 'unpaid') return;
   }
 
   console.warn('QuickBooks payment remained unsettled after webhook retries.', { invoiceId });
