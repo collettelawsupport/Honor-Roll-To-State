@@ -1,10 +1,17 @@
 import { getStore } from '@netlify/blobs';
 import type { RegistrationRecord } from './types.mts';
 
-const STORE_NAME = 'olm-honor-roll-to-state';
+const SANDBOX_STORE_NAME = 'olm-honor-roll-to-state';
+const PRODUCTION_STORE_NAME = 'olm-honor-roll-to-state-production';
+
+export function registrationStoreName(environment = process.env.QBO_ENVIRONMENT) {
+  return environment?.trim().toLowerCase() === 'production'
+    ? PRODUCTION_STORE_NAME
+    : SANDBOX_STORE_NAME;
+}
 
 function store() {
-  return getStore({ name: STORE_NAME, consistency: 'strong' });
+  return getStore({ name: registrationStoreName(), consistency: 'strong' });
 }
 
 export async function createRegistration(record: RegistrationRecord) {

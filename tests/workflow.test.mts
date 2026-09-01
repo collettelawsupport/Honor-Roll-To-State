@@ -22,7 +22,7 @@ import {
   verifyWebhookSignature,
 } from '../netlify/lib/workflow.mts';
 import type { RegistrationRecord } from '../netlify/lib/types.mts';
-import type { QuickBooksTokens } from '../netlify/lib/store.mts';
+import { registrationStoreName, type QuickBooksTokens } from '../netlify/lib/store.mts';
 
 const quietLogger = {
   info: () => undefined,
@@ -78,6 +78,12 @@ test('validates the published registration choices and entry fee', () => {
   assert.equal(normalized.entryFeeCents, 33_000);
   assert.equal(normalized.depositCents, 10_000);
   assert.equal(normalized.values.email, 'parent@example.com');
+});
+
+test('keeps production registrations and OAuth tokens isolated from sandbox data', () => {
+  assert.equal(registrationStoreName('sandbox'), 'olm-honor-roll-to-state');
+  assert.equal(registrationStoreName('production'), 'olm-honor-roll-to-state-production');
+  assert.notEqual(registrationStoreName('sandbox'), registrationStoreName('production'));
 });
 
 test('requires an actual signature for the selected signature method', () => {

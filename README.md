@@ -32,7 +32,7 @@ Unknown or pending prices are deliberately left off the updated invoice and iden
 
 The dedicated production build falls back to `https://honorrollregistration.texasourlittlemiss.net` for public metadata and application links. `NEXT_PUBLIC_SITE_URL` should still be set to that same value in Netlify so the deployment configuration remains explicit.
 
-Netlify Blobs stores registrations, private workflow tokens, invoice mappings, OAuth state, and the rotating QuickBooks refresh token. Secrets and contestant records are never committed to GitHub.
+Netlify Blobs stores registrations, private workflow tokens, invoice mappings, OAuth state, and the rotating QuickBooks refresh token. Production uses a separate store from sandbox so test invoice IDs and contestant records cannot be processed against the live QuickBooks company. Secrets and contestant records are never committed to GitHub.
 
 ### Put the Big Form link in the email body
 
