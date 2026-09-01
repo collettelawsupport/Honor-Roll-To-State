@@ -3,6 +3,7 @@ import { createHmac } from 'node:crypto';
 import test from 'node:test';
 import {
   assertRegistrationWorkflowReady,
+  completeQuickBooksAuthorization,
   executeQuickBooksRequest,
   missingRegistrationWorkflowSettings,
   QuickBooksApiError,
@@ -123,6 +124,40 @@ test('routes the paid Big Form invitation back to the Honor Roll workflow', () =
   assert.equal(url.searchParams.get('registration'), record.id);
   assert.equal(url.searchParams.get('workflow_token'), record.workflowToken);
   assert.equal(url.searchParams.get('workflow'), 'honor_roll');
+});
+
+test('treats a duplicate OAuth callback as success when the same company is already connected', async () => {
+  const connected = { ...quickBooksTokens, realmId: '9341457826769811' };
+  let exchanged = false;
+
+  const result = await completeQuickBooksAuthorization(
+    'one-time-code',
+    connected.realmId,
+    'already-consumed-state',
+    async () => false,
+    async () => connected,
+    async () => {
+      exchanged = true;
+      return connected;
+    },
+  );
+
+  assert.equal(result, connected);
+  assert.equal(exchanged, false);
+});
+
+test('rejects an invalid OAuth callback when no matching company is connected', async () => {
+  await assert.rejects(
+    () => completeQuickBooksAuthorization(
+      'one-time-code',
+      '9341457826769811',
+      'invalid-state',
+      async () => false,
+      async () => null,
+      async () => assert.fail('An invalid callback must not exchange an authorization code.'),
+    ),
+    /missing or expired/i,
+  );
 });
 
 test('verifies Intuit webhook signatures over the raw body', () => {

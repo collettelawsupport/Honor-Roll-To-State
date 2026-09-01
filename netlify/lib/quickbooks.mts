@@ -246,11 +246,28 @@ export async function quickBooksAuthorizationUrl() {
   return url.toString();
 }
 
-export async function completeQuickBooksAuthorization(code: string, realmId: string, state: string) {
-  if (!code || !realmId || !state || !await consumeOauthState(state)) {
+export async function completeQuickBooksAuthorization(
+  code: string,
+  realmId: string,
+  state: string,
+  consumeState: (value: string) => Promise<boolean> = consumeOauthState,
+  loadTokens: () => Promise<QuickBooksTokens | null> = getQuickBooksTokens,
+  requestTokens: (body: URLSearchParams, activeRealmId: string) => Promise<QuickBooksTokens> = tokenRequest,
+) {
+  if (!code || !realmId || !state) {
     throw new HttpError('The QuickBooks authorization request is missing or expired.', 400);
   }
-  return tokenRequest(new URLSearchParams({
+
+  if (!await consumeState(state)) {
+    const saved = await loadTokens();
+    if (saved?.realmId === realmId && saved.refreshToken) {
+      console.warn('Duplicate QuickBooks OAuth callback ignored because this company is already connected.');
+      return saved;
+    }
+    throw new HttpError('The QuickBooks authorization request is missing or expired.', 400);
+  }
+
+  return requestTokens(new URLSearchParams({
     grant_type: 'authorization_code',
     code,
     redirect_uri: redirectUri(),
