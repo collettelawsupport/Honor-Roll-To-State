@@ -32,7 +32,7 @@ export const usStates = [
 export const registrationSteps = [
   { shortTitle: 'Contestant details', title: 'Registration information' },
   { shortTitle: 'Entry level', title: 'Choose your entry level' },
-  { shortTitle: 'Release & invoice', title: 'Release and QuickBooks invoice' },
+  { shortTitle: 'Release & payment', title: 'Release and required payment' },
 ] as const;
 
 export const importantInformation = [
@@ -41,7 +41,7 @@ export const importantInformation = [
   'Honor Roll optional competitions are 50% off when paid in advance. Optionals paid at the door are regular price.',
   'The remaining entry fee is due on or before October 9, 2026 to lock in the Honor Roll price. After that date, preliminary-contestant pricing applies.',
   'Big Forms, photos, good luck messages, and ads are due October 15, 2026.',
-  'Submit this form and the deposit as soon as possible. QuickBooks will email the remaining balance after registration.',
+  'The deposit must be paid as part of checkout. QuickBooks will email the paid deposit invoice and the remaining balance after registration.',
 ];
 
 export const registrationReleaseText = `By electronically signing this form, I understand that the remainder of the contestant's entry fee is due on or before October 9, 2026. After that date, I may still register at preliminary-contestant pricing. I understand that all money received by Texas Our Little Miss is non-refundable and non-transferable if the contestant does not compete at the state competition. This form will secure the contestant's number and entry into the Texas Our Little Miss State Finals, October 30–November 1, 2026, in College Station, Texas.

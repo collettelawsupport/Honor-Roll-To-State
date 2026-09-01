@@ -72,7 +72,7 @@ export default async function submitRegistration(request: Request) {
     }
 
     const checkoutUrl = await ensureInvoice(record);
-    return json('Your QuickBooks invoice is ready.', 201, { registrationId: record.id, checkoutUrl });
+    return json('Your required QuickBooks payment is ready.', 201, { registrationId: record.id, checkoutUrl });
   } catch (error) {
     if (record) {
       record.status = 'invoice_error';

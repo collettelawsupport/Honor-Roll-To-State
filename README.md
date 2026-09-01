@@ -2,7 +2,7 @@
 
 A separate Netlify-hosted registration and invoicing workflow for 2026 Texas Our Little Miss Honor Roll and Winner's Circle contestants.
 
-The public form follows the existing Prelim-to-State workflow while using the published [Honor Roll Cognito form](https://www.cognitoforms.com/TexasOurLittleMiss2/TexasStateUniversalBeauty2026HonorRollOnly) prices. It replaces embedded card fields with a QuickBooks Online invoice, so no card information passes through this site.
+The public form follows the existing Prelim-to-State workflow while using the published [Honor Roll Cognito form](https://www.cognitoforms.com/TexasOurLittleMiss2/TexasStateUniversalBeauty2026HonorRollOnly) prices. Checkout creates a QuickBooks Online invoice and immediately opens QuickBooks' secure payment screen, so no card information passes through this site.
 
 Published pricing:
 
@@ -14,8 +14,8 @@ Published pricing:
 ## Workflow
 
 1. A contestant completes the registration form and signs the release.
-2. A Netlify Function saves the registration in a dedicated Honor Roll Netlify Blobs store, creates the contestant as a QuickBooks customer, creates the selected `$100` or `$75` deposit invoice, enables QuickBooks online payments, and emails the invoice.
-3. Intuit sends a signed `Payment` or `Invoice` webhook after the deposit is paid.
+2. A Netlify Function saves the pending registration in a dedicated Honor Roll Netlify Blobs store, creates the contestant as a QuickBooks customer, creates the selected `$100` or `$75` deposit invoice, enables QuickBooks online payments, and emails the invoice.
+3. The contestant is sent directly to QuickBooks' secure payment screen. The registration remains pending until the required deposit is paid. QuickBooks applies the payment to its invoice and Intuit sends a signed `Payment` or `Invoice` webhook.
 4. The app emails the contestant a private Big Form link with a prominent button and the full URL in the message body. If Resend is not configured, it falls back to adding the link to the paid QuickBooks invoice and emailing the invoice again through QuickBooks.
 5. The Big Form sends its fee summary to the protected `/api/paperwork-complete` endpoint.
 6. The deposit-only invoice is replaced with the contestant's selected full entry fee, eligible optional competitions at 50%, and full-price tickets and advertising. The original deposit remains applied, and QuickBooks emails the updated balance.
@@ -34,16 +34,16 @@ The dedicated production build falls back to `https://honorrollregistration.texa
 
 Netlify Blobs stores registrations, private workflow tokens, invoice mappings, OAuth state, and the rotating QuickBooks refresh token. Production uses a separate store from sandbox so test invoice IDs and contestant records cannot be processed against the live QuickBooks company. Secrets and contestant records are never committed to GitHub.
 
-### Put the Big Form link in the email body
+### Optional custom Big Form email
 
-QuickBooks controls the invoice-email template and does not expose a custom message body through the invoice send operation. Configure the following Netlify environment variables to send a separate paid-registration invitation through Resend:
+QuickBooks already emails the invoice and no separate email provider is required for registration or payment. QuickBooks controls that invoice-email template and does not expose a custom message body through the invoice send operation. If a separate Big Form email with a custom button in its body is desired, configure Resend with:
 
 ```text
 RESEND_API_KEY=your-resend-api-key
 EMAIL_FROM=Texas Our Little Miss <registration@updates.texasourlittlemiss.net>
 ```
 
-The domain used by `EMAIL_FROM` must be verified in Resend. After adding the variables, redeploy the site. The invitation includes a **Complete the Big Form** button, the full clickable URL as a fallback, and a plain-text version. The existing QuickBooks invoice remains the payment record but is not re-emailed for the invitation.
+The domain used by `EMAIL_FROM` must be verified in Resend. After adding the variables, redeploy the site. The invitation includes a **Complete the Big Form** button, the full clickable URL as a fallback, and a plain-text version. If these variables are not configured, the workflow adds the Big Form link to the paid invoice and emails that invoice again through QuickBooks.
 
 ## QuickBooks Online setup
 
