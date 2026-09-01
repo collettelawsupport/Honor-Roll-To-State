@@ -101,6 +101,10 @@ test('builds a $100 deposit-only QuickBooks invoice', () => {
   assert.equal(invoice.Line[0].Amount, 100);
   assert.equal(invoice.CustomerRef.value, '42');
   assert.equal(invoice.AllowOnlineCreditCardPayment, true);
+  assert.match(invoice.Line[0].Description, /deposit due now/i);
+  assert.match(invoice.CustomerMemo.value, /Deposit due now: \$100\.00/);
+  assert.match(invoice.CustomerMemo.value, /Remaining entry fee balance after deposit: \$230\.00/);
+  assert.match(invoice.CustomerMemo.value, /due on or before October 9, 2026/);
 });
 
 test('replaces the deposit line with the full entry fee and discounts only eligible optionals', () => {

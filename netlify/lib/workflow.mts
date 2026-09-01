@@ -123,17 +123,22 @@ function salesLine(amount: number, description: string, itemId: string, quantity
 
 export function buildDepositInvoice(record: RegistrationRecord, registrationItemId: string) {
   const name = `${record.values.contestant_first_name} ${record.values.contestant_last_name}`.trim();
+  const deposit = (record.depositCents / 100).toLocaleString('en-US', { style: 'currency', currency: 'USD' });
+  const remainingBalanceCents = Math.max(0, record.entryFeeCents - record.depositCents);
+  const remainingBalance = (remainingBalanceCents / 100).toLocaleString('en-US', { style: 'currency', currency: 'USD' });
   return {
     CustomerRef: { value: record.qbo?.customerId },
     BillEmail: { Address: record.values.email },
     TxnDate: new Date().toISOString().slice(0, 10),
     DueDate: new Date().toISOString().slice(0, 10),
     PrivateNote: `OLM registration ${record.id}`,
-    CustomerMemo: { value: `Required deposit for ${name}. The deposit will be applied to the selected state competition entry fee.` },
+    CustomerMemo: {
+      value: `Deposit due now: ${deposit}. Remaining entry fee balance after deposit: ${remainingBalance}, still due on or before October 9, 2026. The deposit will be applied to the selected state competition entry fee.`,
+    },
     AllowOnlinePayment: true,
     AllowOnlineCreditCardPayment: true,
     AllowOnlineACHPayment: true,
-    Line: [salesLine(record.depositCents / 100, `2026 Texas Our Little Miss required registration deposit — ${name}`, registrationItemId)],
+    Line: [salesLine(record.depositCents / 100, `2026 Texas Our Little Miss registration deposit due now - ${name}`, registrationItemId)],
   };
 }
 
