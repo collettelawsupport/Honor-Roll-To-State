@@ -1,4 +1,5 @@
 import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
+import { publicQuickBooksInvoiceUrl } from './invoice-url.mts';
 import {
   HONOR_ROLL_OPTIONAL_DISCOUNT,
   ageDivisions,
@@ -183,6 +184,6 @@ export function publicStatus(record: RegistrationRecord) {
     paid: Boolean(record.paidAt),
     paperworkComplete: Boolean(record.bigFormSubmissionId),
     invoiceUpdated: Boolean(record.invoiceUpdatedAt),
-    invoiceUrl: record.qbo?.invoiceUrl || '',
+    invoiceUrl: publicQuickBooksInvoiceUrl(record.qbo?.invoiceUrl),
   };
 }

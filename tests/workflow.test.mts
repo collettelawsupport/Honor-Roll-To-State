@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { createHmac } from 'node:crypto';
 import test from 'node:test';
+import { publicQuickBooksInvoiceUrl } from '../netlify/lib/invoice-url.mts';
 import {
   assertRegistrationWorkflowReady,
   completeQuickBooksAuthorization,
@@ -124,6 +125,18 @@ test('routes the paid Big Form invitation back to the Honor Roll workflow', () =
   assert.equal(url.searchParams.get('registration'), record.id);
   assert.equal(url.searchParams.get('workflow_token'), record.workflowToken);
   assert.equal(url.searchParams.get('workflow'), 'honor_roll');
+});
+
+test('does not expose unusable QuickBooks sandbox invoice links', () => {
+  assert.equal(
+    publicQuickBooksInvoiceUrl('https://developer.intuit.com/app/developer/sandbox', 'sandbox'),
+    '',
+  );
+  assert.equal(
+    publicQuickBooksInvoiceUrl('https://app.qbo.intuit.com/app/invoice?txnId=99', 'production'),
+    'https://app.qbo.intuit.com/app/invoice?txnId=99',
+  );
+  assert.equal(publicQuickBooksInvoiceUrl('javascript:alert(1)', 'production'), '');
 });
 
 test('treats a duplicate OAuth callback as success when the same company is already connected', async () => {

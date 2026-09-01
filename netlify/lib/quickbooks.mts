@@ -1,5 +1,6 @@
 import { randomBytes } from 'node:crypto';
 import { HttpError } from './http.mts';
+import { publicQuickBooksInvoiceUrl } from './invoice-url.mts';
 import {
   consumeOauthState,
   deleteQuickBooksTokens,
@@ -377,7 +378,11 @@ export async function createDepositInvoice(record: RegistrationRecord) {
   });
   const invoice = result.Invoice;
   if (!invoice?.Id) throw new Error('QuickBooks created the invoice without returning an ID.');
-  return { invoiceId: invoice.Id, invoiceNumber: invoice.DocNumber || '', invoiceUrl: invoice.InvoiceLink || '' };
+  return {
+    invoiceId: invoice.Id,
+    invoiceNumber: invoice.DocNumber || '',
+    invoiceUrl: publicQuickBooksInvoiceUrl(invoice.InvoiceLink),
+  };
 }
 
 export async function getInvoice(invoiceId: string) {
@@ -398,7 +403,7 @@ export async function sendInvoice(invoiceId: string, email: string) {
   const invoice = await getInvoice(invoiceId);
   return {
     invoiceNumber: typeof invoice.DocNumber === 'string' ? invoice.DocNumber : '',
-    invoiceUrl: typeof invoice.InvoiceLink === 'string' ? invoice.InvoiceLink : '',
+    invoiceUrl: publicQuickBooksInvoiceUrl(invoice.InvoiceLink),
   };
 }
 
@@ -451,7 +456,10 @@ export async function updateInvoiceFromBigForm(record: RegistrationRecord, fees:
   });
   if (!result.Invoice?.Id) throw new Error('QuickBooks did not return the updated invoice.');
   const sent = await sendInvoice(invoiceId, record.values.email);
-  return { invoiceNumber: sent.invoiceNumber || result.Invoice.DocNumber || '', invoiceUrl: sent.invoiceUrl || result.Invoice.InvoiceLink || '' };
+  return {
+    invoiceNumber: sent.invoiceNumber || result.Invoice.DocNumber || '',
+    invoiceUrl: sent.invoiceUrl || publicQuickBooksInvoiceUrl(result.Invoice.InvoiceLink),
+  };
 }
 
 export async function connectedRealmId() {

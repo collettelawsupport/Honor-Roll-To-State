@@ -1,6 +1,7 @@
 import { randomBytes, randomUUID } from 'node:crypto';
 import type { Config } from '@netlify/functions';
 import { HttpError, errorResponse, json, readJsonBody } from '../lib/http.mts';
+import { publicQuickBooksInvoiceUrl } from '../lib/invoice-url.mts';
 import {
   assertRegistrationWorkflowReady,
   createCustomer,
@@ -33,7 +34,7 @@ async function ensureInvoice(record: RegistrationRecord) {
   if (!record.qbo.invoiceId) throw new Error('The QuickBooks invoice ID is missing.');
   const sent = await sendInvoice(record.qbo.invoiceId, record.values.email);
   record.qbo.invoiceNumber = sent.invoiceNumber || record.qbo.invoiceNumber;
-  record.qbo.invoiceUrl = sent.invoiceUrl || record.qbo.invoiceUrl;
+  record.qbo.invoiceUrl = sent.invoiceUrl || publicQuickBooksInvoiceUrl(record.qbo.invoiceUrl);
   record.status = record.paidAt ? 'paid' : 'invoice_created';
   delete record.lastError;
   await saveRegistration(record);

@@ -1,5 +1,6 @@
 import type { Config } from '@netlify/functions';
 import { HttpError, errorResponse, json, readJsonBody } from '../lib/http.mts';
+import { publicQuickBooksInvoiceUrl } from '../lib/invoice-url.mts';
 import { updateInvoiceFromBigForm } from '../lib/quickbooks.mts';
 import { getRegistration, saveRegistration } from '../lib/store.mts';
 import { normalizeBigFormFees, secureEqual } from '../lib/workflow.mts';
@@ -22,7 +23,9 @@ export default async function paperworkComplete(request: Request) {
     if (!record || !secureEqual(workflowToken, record.workflowToken)) throw new HttpError('Registration not found.', 404);
     if (!record.paidAt) throw new HttpError('The registration deposit has not been marked paid.', 409);
     if (record.invoiceUpdatedAt && record.bigFormSubmissionId === submissionId) {
-      return json('The QuickBooks invoice was already updated.', 200, { invoiceUrl: record.qbo?.invoiceUrl || '' });
+      return json('The QuickBooks invoice was already updated.', 200, {
+        invoiceUrl: publicQuickBooksInvoiceUrl(record.qbo?.invoiceUrl),
+      });
     }
     if (record.bigFormSubmissionId && record.bigFormSubmissionId !== submissionId) {
       throw new HttpError('A different Big Form submission is already linked to this registration.', 409);
