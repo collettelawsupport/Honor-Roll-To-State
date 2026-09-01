@@ -15,8 +15,8 @@ export const ageDivisions = [
 
 export const entryLevels = [
   { value: 'honor_roll', label: 'Honor Roll Contestant', feeCents: 33_000, depositCents: 10_000 },
-  { value: 'winners_circle_125', label: "Winner's Circle Contestant — entry fee only", feeCents: 12_500, depositCents: 7_500 },
-  { value: 'winners_circle_175', label: "Winner's Circle Contestant — entry fee plus contestant and chaperone party tickets", feeCents: 17_500, depositCents: 7_500 },
+  { value: 'winners_circle_125', label: "Winner's Circle Contestant — entry fee only", feeCents: 12_500, depositCents: 10_000 },
+  { value: 'winners_circle_175', label: "Winner's Circle Contestant — entry fee plus contestant and chaperone party tickets", feeCents: 17_500, depositCents: 10_000 },
 ] as const;
 
 export const usStates = [
@@ -37,7 +37,7 @@ export const registrationSteps = [
 
 export const importantInformation = [
   'Honor Roll entry fee: $330 with a $100 deposit due now. The deposit is subtracted from the entry fee.',
-  "Winner's Circle entry fee: $125, or $175 including a party ticket for the contestant and chaperone. A $75 deposit is due now, and contestants must have already paid the World deposit.",
+  "Winner's Circle entry fee: $125, or $175 including a party ticket for the contestant and chaperone. A $100 deposit is due now, and contestants must have already paid the World deposit.",
   'Honor Roll optional competitions are 50% off when paid in advance. Optionals paid at the door are regular price.',
   'The remaining entry fee is due on or before October 9, 2026 to lock in the Honor Roll price. After that date, preliminary-contestant pricing applies.',
   'Big Forms, photos, good luck messages, and ads are due October 15, 2026.',

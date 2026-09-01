@@ -365,7 +365,7 @@ export default function RegistrationPage() {
             </article>
             <fieldset className="choice-field">
               <legend>Entry level <RequiredMark /></legend>
-              <p className="field-help">The $100 Honor Roll deposit or $75 Winner&apos;s Circle deposit is subtracted from the selected entry fee.</p>
+              <p className="field-help">The $100 registration deposit is subtracted from the selected entry fee.</p>
               <div className="choice-grid">
                 {entryLevels.map((level) => (
                   <label className="choice" key={level.value}>

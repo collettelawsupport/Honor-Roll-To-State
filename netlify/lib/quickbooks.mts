@@ -16,14 +16,16 @@ const TOKEN_URL = 'https://oauth.platform.intuit.com/oauth2/v1/tokens/bearer';
 const AUTHORIZE_URL = 'https://appcenter.intuit.com/connect/oauth2';
 const MINOR_VERSION = '75';
 const PRODUCTION_SITE_URL = 'https://honorrollregistration.texasourlittlemiss.net';
+const DEFAULT_REGISTRATION_ITEM_SKU = 'OLM-STATE-REG';
+const DEFAULT_OPTIONAL_ITEM_SKU = 'OLM-OPTIONAL';
+const SAFE_ITEM_SKU = /^[A-Za-z0-9._-]{1,100}$/;
+const itemIdCache = new Map<string, string>();
 const REQUIRED_WORKFLOW_SETTINGS = [
   'QBO_CLIENT_ID',
   'QBO_CLIENT_SECRET',
   'QBO_ENVIRONMENT',
   'QBO_SETUP_KEY',
   'QBO_WEBHOOK_VERIFIER_TOKEN',
-  'QBO_REGISTRATION_ITEM_ID',
-  'QBO_OPTIONAL_ITEM_ID',
   'BIG_FORM_URL',
   'BIG_FORM_CALLBACK_SECRET',
   'REGISTRATION_ENABLED',
@@ -87,9 +89,15 @@ export class QuickBooksReconnectRequiredError extends HttpError {
 }
 
 export function missingRegistrationWorkflowSettings(environment: Record<string, string | undefined>) {
-  const missing = REQUIRED_WORKFLOW_SETTINGS.filter((name) => !environment[name]?.trim());
+  const missing: string[] = REQUIRED_WORKFLOW_SETTINGS.filter((name) => !environment[name]?.trim());
   const qboEnvironment = environment.QBO_ENVIRONMENT?.trim();
   if (qboEnvironment && !['sandbox', 'production'].includes(qboEnvironment)) missing.push('QBO_ENVIRONMENT');
+  for (const [name, fallback] of [
+    ['QBO_REGISTRATION_ITEM_SKU', DEFAULT_REGISTRATION_ITEM_SKU],
+    ['QBO_OPTIONAL_ITEM_SKU', DEFAULT_OPTIONAL_ITEM_SKU],
+  ] as const) {
+    if (!SAFE_ITEM_SKU.test(environment[name]?.trim() || fallback)) missing.push(name);
+  }
   if (environment.REGISTRATION_ENABLED?.trim().toLowerCase() !== 'true') missing.push('REGISTRATION_ENABLED');
   return [...new Set(missing)];
 }
@@ -340,6 +348,49 @@ export async function qboRequest<T>(path: string, init: RequestInit = {}) {
   return executeQuickBooksRequest<T>(tokens, path, init, request, refreshQuickBooksTokens, deleteQuickBooksTokens);
 }
 
+function itemSku(name: 'QBO_REGISTRATION_ITEM_SKU' | 'QBO_OPTIONAL_ITEM_SKU', fallback: string) {
+  const sku = process.env[name]?.trim() || fallback;
+  if (!SAFE_ITEM_SKU.test(sku)) throw new Error(`${name} contains an invalid QuickBooks SKU.`);
+  return sku;
+}
+
+export function quickBooksItemIdFromQuery(result: unknown, sku: string) {
+  const queryResponse = result && typeof result === 'object' && 'QueryResponse' in result
+    ? (result.QueryResponse as Record<string, unknown>)
+    : {};
+  const rawItems = queryResponse.Item;
+  const items = Array.isArray(rawItems) ? rawItems : rawItems && typeof rawItems === 'object' ? [rawItems] : [];
+  const matches = items.filter((item) => item && typeof item === 'object'
+    && (item as Record<string, unknown>).Sku === sku
+    && (item as Record<string, unknown>).Active !== false);
+
+  if (!matches.length) {
+    throw new Error(`QuickBooks does not contain an active product or service with SKU "${sku}".`);
+  }
+  if (matches.length > 1) {
+    throw new Error(`QuickBooks contains more than one active product or service with SKU "${sku}".`);
+  }
+  const id = (matches[0] as Record<string, unknown>).Id;
+  if (typeof id !== 'string' || !id.trim()) {
+    throw new Error(`QuickBooks product or service "${sku}" does not have an ID.`);
+  }
+  return id;
+}
+
+async function quickBooksItemIdForSku(sku: string) {
+  const realmId = await connectedRealmId();
+  if (!realmId) throw new QuickBooksReconnectRequiredError();
+  const cacheKey = `${apiBase()}|${realmId}|${sku}`;
+  const cached = itemIdCache.get(cacheKey);
+  if (cached) return cached;
+
+  const query = `select * from Item where Sku = '${sku}' maxresults 10`;
+  const result = await qboRequest<unknown>(`/query?query=${encodeURIComponent(query)}&minorversion=${MINOR_VERSION}`);
+  const itemId = quickBooksItemIdFromQuery(result, sku);
+  itemIdCache.set(cacheKey, itemId);
+  return itemId;
+}
+
 export async function createCustomer(record: RegistrationRecord) {
   const contestant = `${record.values.contestant_first_name} ${record.values.contestant_last_name}`.trim();
   const chaperone = `${record.values.chaperone_first_name} ${record.values.chaperone_last_name}`.trim();
@@ -370,7 +421,7 @@ export async function createCustomer(record: RegistrationRecord) {
 }
 
 export async function createDepositInvoice(record: RegistrationRecord) {
-  const itemId = requiredEnv('QBO_REGISTRATION_ITEM_ID');
+  const itemId = await quickBooksItemIdForSku(itemSku('QBO_REGISTRATION_ITEM_SKU', DEFAULT_REGISTRATION_ITEM_SKU));
   if (!record.qbo?.customerId) throw new Error('A QuickBooks customer is required before creating an invoice.');
   const result = await qboRequest<{ Invoice?: { Id?: string; DocNumber?: string; InvoiceLink?: string } }>(`/invoice?minorversion=${MINOR_VERSION}`, {
     method: 'POST',
@@ -428,8 +479,10 @@ export async function updateInvoiceFromBigForm(record: RegistrationRecord, fees:
   const invoiceId = record.qbo?.invoiceId;
   const customerId = record.qbo?.customerId;
   if (!invoiceId || !customerId) throw new Error('The registration has no QuickBooks invoice.');
-  const registrationItemId = requiredEnv('QBO_REGISTRATION_ITEM_ID');
-  const optionalItemId = process.env.QBO_OPTIONAL_ITEM_ID?.trim() || registrationItemId;
+  const [registrationItemId, optionalItemId] = await Promise.all([
+    quickBooksItemIdForSku(itemSku('QBO_REGISTRATION_ITEM_SKU', DEFAULT_REGISTRATION_ITEM_SKU)),
+    quickBooksItemIdForSku(itemSku('QBO_OPTIONAL_ITEM_SKU', DEFAULT_OPTIONAL_ITEM_SKU)),
+  ]);
   const current = await getInvoice(invoiceId);
   const syncToken = typeof current.SyncToken === 'string' ? current.SyncToken : '';
   const pendingNote = fees.pendingCount

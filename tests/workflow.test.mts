@@ -8,6 +8,7 @@ import {
   completeQuickBooksAuthorization,
   executeQuickBooksRequest,
   missingRegistrationWorkflowSettings,
+  quickBooksItemIdFromQuery,
   QuickBooksApiError,
   QuickBooksOAuthError,
   QuickBooksReconnectRequiredError,
@@ -17,6 +18,7 @@ import {
   buildDepositInvoice,
   buildBigFormUrl,
   buildFinalInvoiceLines,
+  classificationForEntryLevel,
   normalizeBigFormFees,
   normalizeRegistrationValues,
   verifyWebhookSignature,
@@ -93,12 +95,12 @@ test('requires an actual signature for the selected signature method', () => {
   );
 });
 
-test('uses the published $75 deposit for both Winner\'s Circle choices', () => {
+test('uses the published $100 deposit for both Winner\'s Circle choices', () => {
   const lowerFee = normalizeRegistrationValues({ ...values, entry_level: 'winners_circle_125' });
   const partyFee = normalizeRegistrationValues({ ...values, entry_level: 'winners_circle_175' });
   assert.deepEqual(
     [lowerFee.entryFeeCents, lowerFee.depositCents, partyFee.entryFeeCents, partyFee.depositCents],
-    [12_500, 7_500, 17_500, 7_500],
+    [12_500, 10_000, 17_500, 10_000],
   );
 });
 
@@ -124,11 +126,20 @@ test('replaces the deposit line with the full entry fee and discounts only eligi
     ],
   });
   const lines = buildFinalInvoiceLines(record, fees, '7', '8');
-  assert.deepEqual(lines.map((line) => line.Amount), [330, 25, 100]);
-  assert.equal(lines[1].SalesItemLineDetail.UnitPrice, 25);
-  assert.match(lines[1].Description, /Honor Roll 50% optional price/);
+  assert.deepEqual(lines.map((line) => line.Amount), [330, 0, 25, 100]);
+  assert.equal(lines[1].DetailType, 'DescriptionOnly');
+  assert.match(lines[1].Description, /deposit previously paid.*\$100\.00 credit remains applied/i);
+  const optionalLine = lines[2] as unknown as { SalesItemLineDetail: { UnitPrice: number } };
+  assert.equal(optionalLine.SalesItemLineDetail.UnitPrice, 25);
+  assert.match(lines[2].Description, /Honor Roll 50% optional price/);
   assert.equal(fees.pendingCount, 1);
   assert.equal(fees.knownTotal, 150);
+});
+
+test('derives the visible Big Form classification from the paid registration entry level', () => {
+  assert.equal(classificationForEntryLevel('honor_roll'), 'Honor Roll');
+  assert.equal(classificationForEntryLevel('winners_circle_125'), "Winner's Circle");
+  assert.equal(classificationForEntryLevel('winners_circle_175'), "Winner's Circle");
 });
 
 test('routes the paid Big Form invitation back to the Honor Roll workflow', () => {
@@ -397,8 +408,6 @@ test('requires QuickBooks authorization after all workflow settings are configur
     'QBO_CLIENT_SECRET',
     'QBO_SETUP_KEY',
     'QBO_WEBHOOK_VERIFIER_TOKEN',
-    'QBO_REGISTRATION_ITEM_ID',
-    'QBO_OPTIONAL_ITEM_ID',
     'BIG_FORM_URL',
     'BIG_FORM_CALLBACK_SECRET',
     'REGISTRATION_ENABLED',
@@ -416,5 +425,36 @@ test('requires QuickBooks authorization after all workflow settings are configur
   );
   await assert.doesNotReject(
     () => assertRegistrationWorkflowReady(environment, async () => quickBooksTokens, quietLogger),
+  );
+});
+
+test('resolves connected-company QuickBooks items by exact active SKU', () => {
+  const result = {
+    QueryResponse: {
+      Item: [
+        { Id: 'sandbox-old', Sku: 'OLM-STATE-REG', Active: false },
+        { Id: 'production-42', Sku: 'OLM-STATE-REG', Active: true },
+        { Id: 'other', Sku: 'OLM-OPTIONAL', Active: true },
+      ],
+    },
+  };
+  assert.equal(quickBooksItemIdFromQuery(result, 'OLM-STATE-REG'), 'production-42');
+});
+
+test('rejects missing or ambiguous connected-company QuickBooks SKUs', () => {
+  assert.throws(
+    () => quickBooksItemIdFromQuery({ QueryResponse: {} }, 'OLM-STATE-REG'),
+    /does not contain an active product or service/i,
+  );
+  assert.throws(
+    () => quickBooksItemIdFromQuery({
+      QueryResponse: {
+        Item: [
+          { Id: '1', Sku: 'OLM-STATE-REG', Active: true },
+          { Id: '2', Sku: 'OLM-STATE-REG', Active: true },
+        ],
+      },
+    }, 'OLM-STATE-REG'),
+    /more than one active product or service/i,
   );
 });

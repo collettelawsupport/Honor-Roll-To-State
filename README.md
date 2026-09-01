@@ -7,14 +7,14 @@ The public form follows the existing Prelim-to-State workflow while using the pu
 Published pricing:
 
 - Honor Roll contestant: `$330` total with a `$100` deposit due now.
-- Winner's Circle contestant: `$125` total with a `$75` deposit due now.
-- Winner's Circle contestant with contestant and chaperone party tickets: `$175` total with a `$75` deposit due now.
+- Winner's Circle contestant: `$125` total with a `$100` deposit due now.
+- Winner's Circle contestant with contestant and chaperone party tickets: `$175` total with a `$100` deposit due now.
 - Eligible optional competitions selected on the Big Form are billed at 50% of their standard advance price. Tickets and advertising remain full price.
 
 ## Workflow
 
 1. A contestant completes the registration form and signs the release.
-2. A Netlify Function saves the pending registration in a dedicated Honor Roll Netlify Blobs store, creates the contestant as a QuickBooks customer, creates the selected `$100` or `$75` deposit invoice, enables QuickBooks online payments, and emails the invoice.
+2. A Netlify Function saves the pending registration in a dedicated Honor Roll Netlify Blobs store, creates the contestant as a QuickBooks customer, creates the `$100` deposit invoice, enables QuickBooks online payments, and emails the invoice.
 3. The contestant is sent directly to QuickBooks' secure payment screen. The registration remains pending until the required deposit is paid. QuickBooks applies the payment to its invoice and Intuit sends a signed `Payment` or `Invoice` webhook.
 4. The app emails the contestant a private Big Form link with a prominent button and the full URL in the message body. If Resend is not configured, it falls back to adding the link to the paid QuickBooks invoice and emailing the invoice again through QuickBooks.
 5. The Big Form sends its fee summary to the protected `/api/paperwork-complete` endpoint.
@@ -56,8 +56,10 @@ https://YOUR-NETLIFY-SITE.netlify.app/api/quickbooks/callback
 In QuickBooks Online:
 
 1. Enable online invoice payments for the connected company.
-2. Create or choose a **Products and services** item for the state registration/entry fee and set its ID as `QBO_REGISTRATION_ITEM_ID`.
-3. Create or choose an optional-category item and set its ID as `QBO_OPTIONAL_ITEM_ID`. If this is omitted, the registration item is used for all lines.
+2. Create or choose a **Products and services** item for the state registration/entry fee with SKU `OLM-STATE-REG`.
+3. Create or choose an optional-category item with SKU `OLM-OPTIONAL`.
+
+The app resolves the connected company's numeric item IDs from these stable SKUs, so sandbox IDs are never reused in production. The SKUs can be overridden with `QBO_REGISTRATION_ITEM_SKU` and `QBO_OPTIONAL_ITEM_SKU` if needed.
 
 In the Intuit app's Webhooks settings, use:
 
@@ -65,7 +67,7 @@ In the Intuit app's Webhooks settings, use:
 https://YOUR-NETLIFY-SITE.netlify.app/api/quickbooks/webhook
 ```
 
-Subscribe to `Payment` and `Invoice` events. Copy Intuit's webhook verifier token into `QBO_WEBHOOK_VERIFIER_TOKEN`.
+Subscribe to the `Create` and `Update` operations for the `Payment` entity. Copy Intuit's webhook verifier token into `QBO_WEBHOOK_VERIFIER_TOKEN`.
 
 After the first Netlify deployment, visit `/connect/`, enter `QBO_SETUP_KEY`, sign in to Intuit, and authorize the correct QuickBooks company. The callback stores the rotating OAuth credentials in Netlify Blobs.
 
@@ -143,7 +145,7 @@ npm run build
 - An expired or revoked refresh token, or a second API `401` after refresh, clears the unusable credentials and returns a reconnect-required status. The contestant's registration remains saved, the public form directs the family to support, and an administrator can reconnect through `/connect/`.
 - The public form checks `/api/registration-readiness` before allowing submission. If required QuickBooks or Big Form settings are missing, or QuickBooks is disconnected, registration is visibly paused and no new contestant record is stored.
 - The public status endpoint requires an independent random status token; a registration UUID by itself cannot reveal the invoice link.
-- The full selected entry fee replaces the original deposit line. The paid `$100` or `$75` stays linked to that invoice, so QuickBooks calculates the remaining balance.
+- The full selected entry fee replaces the original deposit line. The paid `$100` stays linked to that invoice, so QuickBooks calculates the remaining balance.
 - Payment webhooks verify that the complete entry-specific deposit invoice is paid before sending the private Big Form invitation.
 - This project uses its own browser-draft key and Netlify Blobs store, so it does not mix Honor Roll registrations with Prelim-to-State registrations.
 - Real customer data, OAuth credentials, webhook tokens, setup keys, and email API keys must never be added to the repository.
