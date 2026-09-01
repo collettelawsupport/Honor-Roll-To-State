@@ -27,7 +27,7 @@ export type RegistrationRecord = {
   };
   paidAt?: string;
   bigFormInvitationSentAt?: string;
-  bigFormInvitationMethod?: 'resend' | 'quickbooks';
+  bigFormInvitationMethod?: 'gmail' | 'resend' | 'quickbooks';
   bigFormSubmissionId?: string;
   invoiceUpdatedAt?: string;
   lastError?: string;

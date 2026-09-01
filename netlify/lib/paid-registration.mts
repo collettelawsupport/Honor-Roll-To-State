@@ -17,9 +17,9 @@ async function sendPaidInvitation(record: RegistrationRecord) {
   const baseUrl = process.env.BIG_FORM_URL?.trim();
   if (!baseUrl) throw new Error('BIG_FORM_URL is not configured.');
   const bigFormUrl = buildBigFormUrl(record, baseUrl);
-  const sentByResend = await sendBigFormInvitation(record, bigFormUrl);
-  if (sentByResend) {
-    record.bigFormInvitationMethod = 'resend';
+  const emailProvider = await sendBigFormInvitation(record, bigFormUrl);
+  if (emailProvider) {
+    record.bigFormInvitationMethod = emailProvider;
   } else {
     const invoice = await updatePaidInvoiceMessage(record, bigFormUrl);
     record.qbo = { ...record.qbo, ...invoice };

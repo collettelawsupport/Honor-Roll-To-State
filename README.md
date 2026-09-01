@@ -36,14 +36,26 @@ Netlify Blobs stores registrations, private workflow tokens, invoice mappings, O
 
 ### Optional custom Big Form email
 
-QuickBooks already emails the invoice and no separate email provider is required for registration or payment. QuickBooks controls that invoice-email template and does not expose a custom message body through the invoice send operation. If a separate Big Form email with a custom button in its body is desired, configure Resend with:
+QuickBooks already emails the invoice and no separate email provider is required for registration or payment. QuickBooks controls that invoice-email template and does not expose a custom message body through the invoice send operation. To send a separate Big Form email with a custom button in its body, configure Gmail or Resend.
+
+For an existing Gmail account, configure:
+
+```text
+GMAIL_USER=texasolm2@gmail.com
+GMAIL_APP_PASSWORD=your-16-character-google-app-password
+EMAIL_FROM=Texas Our Little Miss <texasolm2@gmail.com>
+```
+
+The Gmail account must have 2-Step Verification enabled. Create a Google App Password specifically for Netlify and store it only as a secret Netlify environment variable. Gmail is preferred when both Gmail and Resend credentials are present.
+
+Alternatively, configure Resend with:
 
 ```text
 RESEND_API_KEY=your-resend-api-key
 EMAIL_FROM=Texas Our Little Miss <registration@updates.texasourlittlemiss.net>
 ```
 
-The domain used by `EMAIL_FROM` must be verified in Resend. After adding the variables, redeploy the site. The invitation includes a **Complete the Big Form** button, the full clickable URL as a fallback, and a plain-text version. If these variables are not configured, the workflow adds the Big Form link to the paid invoice and emails that invoice again through QuickBooks.
+The domain used by `EMAIL_FROM` must be verified in Resend. After adding either provider's variables, redeploy the site. The invitation includes a **Complete the Big Form** button, the full clickable URL as a fallback, and a plain-text version. If neither provider is configured, the workflow adds the Big Form link to the paid invoice and emails that invoice again through QuickBooks.
 
 ## QuickBooks Online setup
 

@@ -2,7 +2,10 @@ import assert from 'node:assert/strict';
 import { createHmac } from 'node:crypto';
 import test from 'node:test';
 import { publicQuickBooksInvoiceUrl } from '../netlify/lib/invoice-url.mts';
-import { buildBigFormInvitationEmail } from '../netlify/lib/email.mts';
+import {
+  buildBigFormInvitationEmail,
+  configuredInvitationEmailProvider,
+} from '../netlify/lib/email.mts';
 import {
   assertRegistrationWorkflowReady,
   completeQuickBooksAuthorization,
@@ -158,6 +161,20 @@ test('puts a prominent Big Form link in both versions of the invitation email', 
   assert.match(message.html, /&amp;workflow_token=workflow-token/);
   assert.match(message.text, /Complete the contestant Big Form here:/);
   assert.match(message.text, new RegExp(bigFormUrl.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+});
+
+test('prefers Gmail for invitations and retains Resend as a fallback', () => {
+  assert.equal(configuredInvitationEmailProvider({
+    GMAIL_USER: 'texasolm2@gmail.com',
+    GMAIL_APP_PASSWORD: 'example-app-password',
+    RESEND_API_KEY: 're_example',
+    EMAIL_FROM: 'Texas Our Little Miss <texasolm2@gmail.com>',
+  }), 'gmail');
+  assert.equal(configuredInvitationEmailProvider({
+    RESEND_API_KEY: 're_example',
+    EMAIL_FROM: 'Texas Our Little Miss <registration@updates.example.com>',
+  }), 'resend');
+  assert.equal(configuredInvitationEmailProvider({}), null);
 });
 
 test('accepts a Big Form host without an explicit protocol', () => {

@@ -1,4 +1,15 @@
+import nodemailer from 'nodemailer';
 import type { RegistrationRecord } from './types.mts';
+
+export type InvitationEmailProvider = 'gmail' | 'resend';
+
+export function configuredInvitationEmailProvider(
+  environment: Readonly<Record<string, string | undefined>> = process.env,
+): InvitationEmailProvider | null {
+  if (environment.GMAIL_USER?.trim() && environment.GMAIL_APP_PASSWORD?.trim()) return 'gmail';
+  if (environment.RESEND_API_KEY?.trim() && environment.EMAIL_FROM?.trim()) return 'resend';
+  return null;
+}
 
 function escapeHtml(value: string) {
   return value.replace(/[&<>'"]/g, (character) => ({
@@ -29,12 +40,38 @@ export function buildBigFormInvitationEmail(record: RegistrationRecord, bigFormU
   };
 }
 
-export async function sendBigFormInvitation(record: RegistrationRecord, bigFormUrl: string) {
-  const apiKey = process.env.RESEND_API_KEY?.trim();
-  const from = process.env.EMAIL_FROM?.trim();
-  if (!apiKey || !from) return false;
+export async function sendBigFormInvitation(
+  record: RegistrationRecord,
+  bigFormUrl: string,
+): Promise<InvitationEmailProvider | null> {
+  const provider = configuredInvitationEmailProvider();
+  if (!provider) return null;
 
   const message = buildBigFormInvitationEmail(record, bigFormUrl);
+  if (provider === 'gmail') {
+    const user = process.env.GMAIL_USER!.trim();
+    const appPassword = process.env.GMAIL_APP_PASSWORD!.replace(/\s/g, '');
+    const from = process.env.EMAIL_FROM?.trim() || `Texas Our Little Miss <${user}>`;
+    const transport = nodemailer.createTransport({
+      service: 'gmail',
+      auth: { user, pass: appPassword },
+      connectionTimeout: 10_000,
+      greetingTimeout: 10_000,
+      socketTimeout: 20_000,
+    });
+    await transport.sendMail({
+      from,
+      to: record.values.email,
+      replyTo: user,
+      ...message,
+    });
+    return 'gmail';
+  }
+
+  const apiKey = process.env.RESEND_API_KEY?.trim();
+  const from = process.env.EMAIL_FROM?.trim();
+  if (!apiKey || !from) return null;
+
   const response = await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: {
@@ -52,5 +89,5 @@ export async function sendBigFormInvitation(record: RegistrationRecord, bigFormU
     const detail = await response.text().catch(() => '');
     throw new Error(`Big Form invitation email failed (${response.status}): ${detail.slice(0, 300)}`);
   }
-  return true;
+  return 'resend';
 }
