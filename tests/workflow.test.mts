@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { createHmac } from 'node:crypto';
 import test from 'node:test';
 import { publicQuickBooksInvoiceUrl } from '../netlify/lib/invoice-url.mts';
+import { buildBigFormInvitationEmail } from '../netlify/lib/email.mts';
 import {
   assertRegistrationWorkflowReady,
   completeQuickBooksAuthorization,
@@ -129,6 +130,17 @@ test('routes the paid Big Form invitation back to the Honor Roll workflow', () =
   assert.equal(url.searchParams.get('registration'), record.id);
   assert.equal(url.searchParams.get('workflow_token'), record.workflowToken);
   assert.equal(url.searchParams.get('workflow'), 'honor_roll');
+});
+
+test('puts a prominent Big Form link in both versions of the invitation email', () => {
+  const bigFormUrl = buildBigFormUrl(record, 'https://bigforms.texasourlittlemiss.net');
+  const message = buildBigFormInvitationEmail(record, bigFormUrl);
+  assert.match(message.subject, /complete Taylor Sample's Big Form/i);
+  assert.match(message.html, />Complete the Big Form<\/a>/);
+  assert.match(message.html, /registration=11111111-1111-4111-8111-111111111111/);
+  assert.match(message.html, /&amp;workflow_token=workflow-token/);
+  assert.match(message.text, /Complete the contestant Big Form here:/);
+  assert.match(message.text, new RegExp(bigFormUrl.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
 });
 
 test('accepts a Big Form host without an explicit protocol', () => {

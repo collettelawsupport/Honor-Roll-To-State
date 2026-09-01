@@ -16,7 +16,7 @@ Published pricing:
 1. A contestant completes the registration form and signs the release.
 2. A Netlify Function saves the registration in a dedicated Honor Roll Netlify Blobs store, creates the contestant as a QuickBooks customer, creates the selected `$100` or `$75` deposit invoice, enables QuickBooks online payments, and emails the invoice.
 3. Intuit sends a signed `Payment` or `Invoice` webhook after the deposit is paid.
-4. The app emails the contestant a private Big Form link. If Resend is not configured, it adds the link to the paid QuickBooks invoice and emails the invoice again through QuickBooks.
+4. The app emails the contestant a private Big Form link with a prominent button and the full URL in the message body. If Resend is not configured, it falls back to adding the link to the paid QuickBooks invoice and emailing the invoice again through QuickBooks.
 5. The Big Form sends its fee summary to the protected `/api/paperwork-complete` endpoint.
 6. The deposit-only invoice is replaced with the contestant's selected full entry fee, eligible optional competitions at 50%, and full-price tickets and advertising. The original deposit remains applied, and QuickBooks emails the updated balance.
 
@@ -33,6 +33,17 @@ Unknown or pending prices are deliberately left off the updated invoice and iden
 The dedicated production build falls back to `https://honorrollregistration.texasourlittlemiss.net` for public metadata and application links. `NEXT_PUBLIC_SITE_URL` should still be set to that same value in Netlify so the deployment configuration remains explicit.
 
 Netlify Blobs stores registrations, private workflow tokens, invoice mappings, OAuth state, and the rotating QuickBooks refresh token. Secrets and contestant records are never committed to GitHub.
+
+### Put the Big Form link in the email body
+
+QuickBooks controls the invoice-email template and does not expose a custom message body through the invoice send operation. Configure the following Netlify environment variables to send a separate paid-registration invitation through Resend:
+
+```text
+RESEND_API_KEY=your-resend-api-key
+EMAIL_FROM=Texas Our Little Miss <registration@updates.texasourlittlemiss.net>
+```
+
+The domain used by `EMAIL_FROM` must be verified in Resend. After adding the variables, redeploy the site. The invitation includes a **Complete the Big Form** button, the full clickable URL as a fallback, and a plain-text version. The existing QuickBooks invoice remains the payment record but is not re-emailed for the invitation.
 
 ## QuickBooks Online setup
 
