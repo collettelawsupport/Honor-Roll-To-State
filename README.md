@@ -16,7 +16,7 @@ Published pricing:
 1. A contestant completes the registration form and signs the release.
 2. A Netlify Function saves the pending registration in a dedicated Honor Roll Netlify Blobs store, creates the contestant as a QuickBooks customer, creates the `$100` deposit invoice, enables QuickBooks online payments, and emails the invoice.
 3. The contestant is sent directly to QuickBooks' secure payment screen. The registration remains pending until the required deposit is paid. QuickBooks applies the payment to its invoice and Intuit sends a signed `Payment` or `Invoice` webhook.
-4. The app emails the contestant a private Big Form link with a prominent button and the full URL in the message body. If Resend is not configured, it falls back to adding the link to the paid QuickBooks invoice and emailing the invoice again through QuickBooks.
+4. The app emails the contestant a private Big Form link with a prominent button, the full URL in the message body, and the 2026 Texas State Handbook PDF attached. If Resend is not configured, it falls back to adding the link to the paid QuickBooks invoice and emailing the invoice again through QuickBooks.
 5. The Big Form sends its fee summary to the protected `/api/paperwork-complete` endpoint.
 6. The deposit-only invoice is replaced with the contestant's selected full entry fee, eligible optional competitions at 50%, and full-price tickets and advertising. The original deposit remains applied, and QuickBooks emails the updated balance.
 
@@ -55,7 +55,7 @@ RESEND_API_KEY=your-resend-api-key
 EMAIL_FROM=Texas Our Little Miss <registration@updates.texasourlittlemiss.net>
 ```
 
-The domain used by `EMAIL_FROM` must be verified in Resend. After adding either provider's variables, redeploy the site. The invitation includes a **Complete the Big Form** button, the full clickable URL as a fallback, and a plain-text version. If neither provider is configured, the workflow adds the Big Form link to the paid invoice and emails that invoice again through QuickBooks.
+The domain used by `EMAIL_FROM` must be verified in Resend. After adding either provider's variables, redeploy the site. The invitation includes a **Complete the Big Form** button, the full clickable URL as a fallback, a plain-text version, and the 2026 Texas State Handbook PDF attachment. If neither provider is configured, the workflow adds the Big Form link to the paid invoice and emails that invoice again through QuickBooks.
 
 ## QuickBooks Online setup
 

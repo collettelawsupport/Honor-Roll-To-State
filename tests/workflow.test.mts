@@ -7,6 +7,11 @@ import {
   configuredInvitationEmailProvider,
 } from '../netlify/lib/email.mts';
 import {
+  BIG_FORM_HANDBOOK_CONTENT_TYPE,
+  BIG_FORM_HANDBOOK_FILENAME,
+  loadBigFormHandbookAttachment,
+} from '../netlify/lib/handbook.mts';
+import {
   assertRegistrationWorkflowReady,
   completeQuickBooksAuthorization,
   executeQuickBooksRequest,
@@ -160,7 +165,17 @@ test('puts a prominent Big Form link in both versions of the invitation email', 
   assert.match(message.html, /registration=11111111-1111-4111-8111-111111111111/);
   assert.match(message.html, /&amp;workflow_token=workflow-token/);
   assert.match(message.text, /Complete the contestant Big Form here:/);
+  assert.match(message.text, /2026 Texas State Handbook is attached/i);
+  assert.match(message.html, /2026 Texas State Handbook.*attached/i);
   assert.match(message.text, new RegExp(bigFormUrl.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+});
+
+test('loads the valid PDF attached to each Big Form invitation', async () => {
+  const attachment = await loadBigFormHandbookAttachment();
+  assert.equal(attachment.filename, BIG_FORM_HANDBOOK_FILENAME);
+  assert.equal(attachment.contentType, BIG_FORM_HANDBOOK_CONTENT_TYPE);
+  assert.equal(attachment.content.subarray(0, 5).toString('ascii'), '%PDF-');
+  assert.ok(attachment.content.length > 1_000_000);
 });
 
 test('prefers Gmail for invitations and retains Resend as a fallback', () => {

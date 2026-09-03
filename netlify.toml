@@ -9,6 +9,12 @@
   directory = "netlify/functions"
   node_bundler = "esbuild"
 
+[functions."reconcile-qbo-payments"]
+  included_files = ["netlify/assets/handbook-texas-state-beauty-2026.pdf"]
+
+[functions."quickbooks-webhook"]
+  included_files = ["netlify/assets/handbook-texas-state-beauty-2026.pdf"]
+
 [[headers]]
   for = "/*"
   [headers.values]

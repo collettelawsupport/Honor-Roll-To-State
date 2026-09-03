@@ -1,4 +1,5 @@
 import nodemailer from 'nodemailer';
+import { loadBigFormHandbookAttachment } from './handbook.mts';
 import type { RegistrationRecord } from './types.mts';
 
 export type InvitationEmailProvider = 'gmail' | 'resend';
@@ -34,9 +35,11 @@ export function buildBigFormInvitationEmail(record: RegistrationRecord, bigFormU
       'Complete the contestant Big Form here:',
       bigFormUrl,
       '',
+      'The 2026 Texas State Handbook is attached to this email.',
+      '',
       'After the Big Form is submitted, QuickBooks will email the updated invoice with the remaining entry fee, 50%-off eligible Honor Roll optionals, and any full-price tickets or advertising.',
     ].join('\n'),
-    html: `<div style="font-family:Arial,sans-serif;line-height:1.55;color:#321b28;max-width:640px"><h2 style="margin-bottom:12px">Deposit received</h2><p>Thank you! We received the ${deposit} state registration deposit for <strong>${safeContestant}</strong>.</p><p>The next step is to complete the contestant Big Form:</p><p style="margin:28px 0"><a href="${safeBigFormUrl}" style="display:inline-block;background:#70264f;color:#ffffff;text-decoration:none;font-weight:700;padding:14px 22px;border-radius:8px">Complete the Big Form</a></p><p style="font-size:14px;color:#654b5b">If the button does not open, use this link:<br><a href="${safeBigFormUrl}">${safeBigFormUrl}</a></p><p>After the Big Form is submitted, QuickBooks will email the updated invoice with the remaining entry fee, 50%-off eligible Honor Roll optionals, and any full-price tickets or advertising.</p></div>`,
+    html: `<div style="font-family:Arial,sans-serif;line-height:1.55;color:#321b28;max-width:640px"><h2 style="margin-bottom:12px">Deposit received</h2><p>Thank you! We received the ${deposit} state registration deposit for <strong>${safeContestant}</strong>.</p><p>The next step is to complete the contestant Big Form:</p><p style="margin:28px 0"><a href="${safeBigFormUrl}" style="display:inline-block;background:#70264f;color:#ffffff;text-decoration:none;font-weight:700;padding:14px 22px;border-radius:8px">Complete the Big Form</a></p><p style="font-size:14px;color:#654b5b">If the button does not open, use this link:<br><a href="${safeBigFormUrl}">${safeBigFormUrl}</a></p><p>The <strong>2026 Texas State Handbook</strong> is attached to this email.</p><p>After the Big Form is submitted, QuickBooks will email the updated invoice with the remaining entry fee, 50%-off eligible Honor Roll optionals, and any full-price tickets or advertising.</p></div>`,
   };
 }
 
@@ -48,6 +51,7 @@ export async function sendBigFormInvitation(
   if (!provider) return null;
 
   const message = buildBigFormInvitationEmail(record, bigFormUrl);
+  const handbook = await loadBigFormHandbookAttachment();
   if (provider === 'gmail') {
     const user = process.env.GMAIL_USER!.trim();
     const appPassword = process.env.GMAIL_APP_PASSWORD!.replace(/\s/g, '');
@@ -64,6 +68,7 @@ export async function sendBigFormInvitation(
       to: record.values.email,
       replyTo: user,
       ...message,
+      attachments: [handbook],
     });
     return 'gmail';
   }
@@ -83,6 +88,10 @@ export async function sendBigFormInvitation(
       from,
       to: [record.values.email],
       ...message,
+      attachments: [{
+        filename: handbook.filename,
+        content: handbook.content.toString('base64'),
+      }],
     }),
   });
   if (!response.ok) {
